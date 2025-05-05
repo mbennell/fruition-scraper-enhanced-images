@@ -56,7 +56,7 @@ const Index = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img 
-                src="/fruition-logo.png" 
+                src="/lovable-uploads/f23f8abb-ad22-427d-bf28-e1a13eb80584.png" 
                 alt="Fruition Logo" 
                 className="h-12" 
               />

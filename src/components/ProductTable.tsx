@@ -2,6 +2,7 @@
 import { Product } from "@/types/product";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
+import { Image } from "lucide-react";
 
 interface ProductTableProps {
   products: Product[];
@@ -16,6 +17,7 @@ const ProductTable = ({ products, isLoading = false }: ProductTableProps) => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-20">Image</TableHead>
                 <TableHead>Product Name</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Description</TableHead>
@@ -24,6 +26,9 @@ const ProductTable = ({ products, isLoading = false }: ProductTableProps) => {
             <TableBody>
               {Array.from({ length: 6 }).map((_, index) => (
                 <TableRow key={index} className="animate-pulse-slow">
+                  <TableCell>
+                    <div className="h-12 w-12 bg-gray-200 rounded"></div>
+                  </TableCell>
                   <TableCell>
                     <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                   </TableCell>
@@ -58,6 +63,7 @@ const ProductTable = ({ products, isLoading = false }: ProductTableProps) => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-20">Image</TableHead>
               <TableHead>Product Name</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Description</TableHead>
@@ -66,6 +72,19 @@ const ProductTable = ({ products, isLoading = false }: ProductTableProps) => {
           <TableBody>
             {products.map((product) => (
               <TableRow key={product.id || product.name}>
+                <TableCell>
+                  {product.imageUrl ? (
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.name}
+                      className="h-12 w-12 object-cover rounded-md"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 bg-gray-100 rounded-md flex items-center justify-center">
+                      <Image className="h-6 w-6 text-gray-400" />
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.price}</TableCell>
                 <TableCell className="text-sm">{product.description}</TableCell>

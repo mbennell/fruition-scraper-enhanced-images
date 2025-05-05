@@ -5,6 +5,7 @@ export interface Product {
   price: string;
   description: string;
   sourceUrl?: string;
+  imageUrl?: string;
 }
 
 export interface ScrapingLog {
