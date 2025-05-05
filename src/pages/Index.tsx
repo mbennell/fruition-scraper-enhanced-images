@@ -51,16 +51,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-brand py-6 border-b">
+      <header className="bg-white py-6 border-b">
         <div className="scraper-container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img 
-                src="/lovable-uploads/0d8bcb64-e66e-4db8-b1a4-7d01b81f96ca.png" 
+                src="/fruition-logo.png" 
                 alt="Fruition Logo" 
                 className="h-12" 
               />
-              <h1 className="text-2xl md:text-3xl font-bold">
+              <h1 className="text-2xl md:text-3xl font-bold text-black">
                 Fruition Product Scraper
               </h1>
             </div>
