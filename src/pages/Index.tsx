@@ -5,6 +5,7 @@ import { scrapeProducts } from "@/services/scrapingService";
 import ScraperControls from "@/components/ScraperControls";
 import ProductTable from "@/components/ProductTable";
 import CSVPreview from "@/components/CSVPreview";
+import ScrapingInstructions from "@/components/ScrapingInstructions";
 import { useToast } from "@/components/ui/use-toast";
 
 const Index = () => {
@@ -52,9 +53,19 @@ const Index = () => {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-brand py-6 border-b">
         <div className="scraper-container">
-          <h1 className="text-2xl md:text-3xl font-bold text-center">
-            R+Co Product Scraper Wizard
-          </h1>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/lovable-uploads/0d8bcb64-e66e-4db8-b1a4-7d01b81f96ca.png" 
+                alt="Fruition Logo" 
+                className="h-12" 
+              />
+              <h1 className="text-2xl md:text-3xl font-bold">
+                Fruition Product Scraper
+              </h1>
+            </div>
+            <ScrapingInstructions />
+          </div>
         </div>
       </header>
       
@@ -72,7 +83,7 @@ const Index = () => {
             <h2 className="text-xl font-semibold">Scraped Products</h2>
             <p className="text-sm text-muted-foreground">
               {products.length > 0 
-                ? `Showing ${products.length} products from R+Co's collection.`
+                ? `Showing ${products.length} products from the collection.`
                 : "Start scraping to see products here."}
             </p>
             
@@ -85,7 +96,7 @@ const Index = () => {
       
       <footer className="border-t py-6">
         <div className="scraper-container text-center text-sm text-muted-foreground">
-          <p>© 2025 R+Co Product Scraper Wizard | For demonstration purposes only</p>
+          <p>© 2025 Fruition Product Scraper | For demonstration purposes only</p>
         </div>
       </footer>
     </div>

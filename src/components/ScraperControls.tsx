@@ -30,9 +30,9 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
   return (
     <Card>
       <CardHeader>
-        <CardTitle>R+Co Product Scraper</CardTitle>
+        <CardTitle>Fruition Product Scraper</CardTitle>
         <CardDescription>
-          Extract product information from the R+Co website
+          Extract product information from e-commerce websites
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -44,7 +44,7 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
               value={url} 
               onChange={(e) => setUrl(e.target.value)}
               className="w-full"
-              placeholder="Enter R+Co collection URL"
+              placeholder="Enter product collection URL"
             />
             <p className="text-xs text-muted-foreground">
               Example: https://www.randco.com/collections/all?pf_pt_type=Conditioner
