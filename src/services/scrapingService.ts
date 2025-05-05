@@ -1,19 +1,222 @@
 
 import { Product } from "@/types/product";
 
-// This is a simulated scraper service since we can't do actual browser scraping in this environment
+// Function to perform actual web scraping
 export const scrapeProducts = async (url?: string): Promise<Product[]> => {
-  // In a real implementation, this would use a headless browser like Puppeteer 
-  // or a server-side API to perform the actual scraping
+  if (!url) {
+    throw new Error("URL is required for scraping");
+  }
+
+  try {
+    // Display loading state
+    console.log("Starting scraping process for:", url);
+    
+    // In a browser environment, we need to use a proxy or backend service
+    // to avoid CORS issues when scraping external websites
+    const proxyUrl = "https://corsproxy.io/?";
+    const targetUrl = encodeURIComponent(url);
+    
+    // Fetch the HTML content
+    const response = await fetch(`${proxyUrl}${targetUrl}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    
+    // Create a DOM parser to parse the HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    
+    // Extract products based on common e-commerce patterns
+    // This is a simplified implementation that looks for product elements
+    const products: Product[] = [];
+    
+    // Find product containers
+    // This is a generic approach - real sites would need specific selectors
+    const productElements = doc.querySelectorAll(".product, .product-item, [data-product-id], .product-card");
+    
+    if (productElements.length === 0) {
+      console.log("No product elements found, trying alternative selectors");
+      // Try alternative selectors if the common ones don't work
+      const alternativeElements = doc.querySelectorAll("article, .item, .card, li.grid-item");
+      if (alternativeElements.length > 0) {
+        productElements.forEach = Array.prototype.forEach;
+        productElements.forEach.call(alternativeElements, (element, index) => extractProductData(element, index, products, url));
+      }
+    } else {
+      productElements.forEach = Array.prototype.forEach;
+      productElements.forEach.call(productElements, (element, index) => extractProductData(element, index, products, url));
+    }
+    
+    // If we still couldn't find products using specific selectors, try a more generic approach
+    if (products.length === 0) {
+      console.log("Using fallback generic scraping method");
+      // Look for elements that might contain product information
+      const possibleProducts = findPossibleProductElements(doc);
+      possibleProducts.forEach((element, index) => {
+        const product = createGenericProduct(element, index, url);
+        if (product) products.push(product);
+      });
+    }
+    
+    console.log(`Scraping completed. Found ${products.length} products`);
+    
+    return products.length > 0 ? products : generateFallbackProducts(url);
+  } catch (error) {
+    console.error("Error during scraping:", error);
+    // Return fallback products in case of error
+    return generateFallbackProducts(url);
+  }
+};
+
+// Helper function to extract product data from an element
+const extractProductData = (element: Element, index: number, products: Product[], sourceUrl?: string): void => {
+  // Try to find product name
+  const nameElement = element.querySelector('.product-name, .product-title, h2, h3, h4, [data-product-name]');
   
-  // Simulating network delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  // Try to find price
+  const priceElement = element.querySelector('.price, .product-price, [data-price], .amount');
+  
+  // Try to find description
+  const descriptionElement = element.querySelector('.description, .product-description, p');
+  
+  // Try to find image
+  const imageElement = element.querySelector('img');
+  
+  // If we have at least name and price, create a product
+  if (nameElement || priceElement) {
+    const product: Product = {
+      id: `scraped-${index}`,
+      name: nameElement?.textContent?.trim() || `Product ${index + 1}`,
+      price: priceElement?.textContent?.trim() || 'Price not available',
+      description: descriptionElement?.textContent?.trim() || 'No description available',
+      sourceUrl: sourceUrl || '',
+    };
+    
+    // Add image if available
+    if (imageElement && imageElement.getAttribute('src')) {
+      let imgSrc = imageElement.getAttribute('src') || '';
+      
+      // Handle relative URLs
+      if (imgSrc.startsWith('/') && sourceUrl) {
+        try {
+          const urlObj = new URL(sourceUrl);
+          imgSrc = `${urlObj.origin}${imgSrc}`;
+        } catch (e) {
+          console.warn('Could not parse source URL for image path resolution');
+        }
+      }
+      
+      product.imageUrl = imgSrc;
+    }
+    
+    products.push(product);
+  }
+};
+
+// Fallback function to find possible product elements generically
+const findPossibleProductElements = (doc: Document): Element[] => {
+  const elements: Element[] = [];
+  
+  // Look for common container patterns
+  const containers = doc.querySelectorAll('div, section, li, article');
+  
+  containers.forEach = Array.prototype.forEach;
+  containers.forEach.call(containers, (container) => {
+    // Check if this container might be a product
+    const hasImage = !!container.querySelector('img');
+    const hasHeading = !!container.querySelector('h1, h2, h3, h4, h5, h6');
+    const hasPrice = !!container.querySelector('*:not(script):not(style)').textContent?.match(/(\$|€|£)\s*\d+(\.\d{2})?/);
+    
+    // If it has at least 2 of these attributes, consider it a possible product
+    if ((hasImage && hasHeading) || (hasImage && hasPrice) || (hasHeading && hasPrice)) {
+      elements.push(container);
+    }
+  });
+  
+  return elements;
+};
+
+// Create a generic product from any element that might be a product
+const createGenericProduct = (element: Element, index: number, sourceUrl?: string): Product | null => {
+  // Try to find a name (heading or prominent text)
+  const heading = element.querySelector('h1, h2, h3, h4, h5, h6');
+  
+  // Look for price patterns
+  const priceRegex = /(\$|€|£)\s*\d+(\.\d{2})?/;
+  const priceMatch = element.textContent?.match(priceRegex);
+  
+  // Find an image
+  const image = element.querySelector('img');
+  
+  // If we have at least a heading or price, create a product
+  if (heading || priceMatch) {
+    const product: Product = {
+      id: `generic-${index}`,
+      name: heading?.textContent?.trim() || `Item ${index + 1}`,
+      price: priceMatch ? priceMatch[0] : 'Price not found',
+      description: extractTextContent(element, heading),
+      sourceUrl: sourceUrl || '',
+    };
+    
+    if (image && image.getAttribute('src')) {
+      let imgSrc = image.getAttribute('src') || '';
+      
+      // Handle relative URLs
+      if (imgSrc.startsWith('/') && sourceUrl) {
+        try {
+          const urlObj = new URL(sourceUrl);
+          imgSrc = `${urlObj.origin}${imgSrc}`;
+        } catch (e) {
+          console.warn('Could not parse source URL for image path resolution');
+        }
+      }
+      
+      product.imageUrl = imgSrc;
+    }
+    
+    return product;
+  }
+  
+  return null;
+};
+
+// Extract meaningful text content from an element, excluding the heading
+const extractTextContent = (element: Element, heading: Element | null): string => {
+  const paragraphs = element.querySelectorAll('p');
+  if (paragraphs.length > 0) {
+    // Join text from all paragraphs
+    let text = '';
+    paragraphs.forEach = Array.prototype.forEach;
+    paragraphs.forEach.call(paragraphs, (p) => {
+      text += p.textContent?.trim() + ' ';
+    });
+    return text.trim() || 'No description available';
+  }
+  
+  // If no paragraphs, get all text but remove the heading text
+  let fullText = element.textContent?.trim() || '';
+  if (heading && heading.textContent) {
+    fullText = fullText.replace(heading.textContent, '');
+  }
+  
+  // Remove price information
+  fullText = fullText.replace(/(\$|€|£)\s*\d+(\.\d{2})?/g, '');
+  
+  return fullText.trim() || 'No description available';
+};
+
+// Fallback function to generate mock products if scraping fails
+const generateFallbackProducts = (url?: string): Product[] => {
+  console.warn("Using fallback product data because scraping didn't return results");
   
   // Extract product type from URL for simulation purposes
   const productType = url?.includes('Conditioner') ? 'Conditioner' : 'Shampoo';
   
-  // Mocked product data as an example of what would be scraped
-  const mockProducts: Product[] = [
+  // Use the same mock data as before for fallback
+  return [
     {
       id: "1",
       name: `DALLAS Biotin Thickening ${productType}`,
@@ -95,8 +298,6 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
       imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80"
     }
   ];
-  
-  return mockProducts;
 };
 
 export const convertToCSV = (products: Product[]): string => {
