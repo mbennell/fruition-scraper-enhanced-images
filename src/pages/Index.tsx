@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Product } from "@/types/product";
+import { Product, ScrapingLog } from "@/types/product";
 import { scrapeProducts } from "@/services/scrapingService";
 import ScraperControls from "@/components/ScraperControls";
 import ProductTable from "@/components/ProductTable";
@@ -11,17 +11,30 @@ const Index = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastScraped, setLastScraped] = useState<Date | null>(null);
+  const [scrapingLogs, setScrapingLogs] = useState<ScrapingLog[]>([]);
   const { toast } = useToast();
 
-  const handleScrape = async () => {
+  const handleScrape = async (url: string) => {
     try {
       setIsLoading(true);
-      const scrapedProducts = await scrapeProducts();
+      const scrapedProducts = await scrapeProducts(url);
       setProducts(scrapedProducts);
-      setLastScraped(new Date());
+      
+      const now = new Date();
+      setLastScraped(now);
+      
+      // Add to scraping logs
+      const newLog: ScrapingLog = {
+        url,
+        timestamp: now,
+        productCount: scrapedProducts.length
+      };
+      
+      setScrapingLogs(prevLogs => [newLog, ...prevLogs]);
+      
       toast({
         title: "Scraping completed",
-        description: `Successfully scraped ${scrapedProducts.length} products.`,
+        description: `Successfully scraped ${scrapedProducts.length} products from ${url}.`,
       });
     } catch (error) {
       console.error("Error during scraping:", error);
@@ -52,13 +65,14 @@ const Index = () => {
             isLoading={isLoading}
             products={products}
             lastScraped={lastScraped}
+            scrapingLogs={scrapingLogs}
           />
           
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Scraped Products</h2>
             <p className="text-sm text-muted-foreground">
               {products.length > 0 
-                ? `Showing ${products.length} products from R+Co's shampoo collection.`
+                ? `Showing ${products.length} products from R+Co's collection.`
                 : "Start scraping to see products here."}
             </p>
             
