@@ -2,7 +2,8 @@
 import { Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Check, AlertTriangle } from "lucide-react";
+import { Download, Check, AlertTriangle, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { convertToSquareSpaceCSV, downloadSquareSpaceCSV } from "@/services/scrapingService";
 
 interface SquareSpaceCSVPreviewProps {
@@ -33,7 +34,7 @@ const SquareSpaceCSVPreview = ({ products, maxRows = 5 }: SquareSpaceCSVPreviewP
         <div>
           <CardTitle>SquareSpace CSV Preview</CardTitle>
           <CardDescription>
-            Preview of the CSV file formatted for SquareSpace import
+            Ready for import to SquareSpace store
           </CardDescription>
         </div>
         <Button 
@@ -47,21 +48,38 @@ const SquareSpaceCSVPreview = ({ products, maxRows = 5 }: SquareSpaceCSVPreviewP
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md overflow-x-auto">
-          <div className={`mb-3 p-2 rounded-md flex items-center gap-2 ${allHaveHighRes ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-            {allHaveHighRes ? (
-              <Check size={18} className="text-green-500 dark:text-green-400" />
-            ) : (
-              <AlertTriangle size={18} className="text-amber-500 dark:text-amber-400" />
-            )}
-            <span>
-              Found high-resolution images for {highResImageCount} of {products.length} products ({highResPercentage}%)
-              {!allHaveHighRes && " - Some products will use thumbnail images instead."}
-            </span>
-          </div>
-          
+        {/* Image Quality Alert */}
+        {allHaveHighRes ? (
+          <Alert className="mb-4 bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
+            <Check className="h-4 w-4 text-green-500 dark:text-green-400" />
+            <AlertTitle>High Quality Images Available</AlertTitle>
+            <AlertDescription>
+              All {products.length} products have high-resolution product images.
+            </AlertDescription>
+          </Alert>
+        ) : highResImageCount > 0 ? (
+          <Alert className="mb-4 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
+            <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+            <AlertTitle>Mixed Image Quality</AlertTitle>
+            <AlertDescription>
+              Found high-resolution images for {highResImageCount} of {products.length} products ({highResPercentage}%).
+              Remaining products will use standard thumbnail images.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="mb-4 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+            <AlertTitle>Using Thumbnail Images</AlertTitle>
+            <AlertDescription>
+              Using thumbnail images for all products. For modern websites with client-side rendering (like Shopify stores),
+              high-resolution images are often loaded dynamically and may require browser automation tools for extraction.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md overflow-x-auto mt-4">
           <p className="text-sm text-muted-foreground mb-2">
-            This format is compatible with SquareSpace's product import tool.
+            This CSV format is compatible with SquareSpace's product import tool.
           </p>
           <pre className="text-xs md:text-sm">
             {previewLines.join("\n")}
