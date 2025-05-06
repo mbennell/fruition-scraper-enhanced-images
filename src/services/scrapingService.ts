@@ -1,3 +1,4 @@
+
 import { Product, SquareSpaceProduct } from "@/types/product";
 
 // Function to perform actual web scraping
@@ -235,6 +236,15 @@ const createGenericProduct = (
   // If no price element found, check if element itself contains a price
   if (!priceMatch && element.textContent) {
     priceMatch = element.textContent.match(priceRegex);
+  }
+  
+  // Try to find image - focusing on PNG from Shopify
+  const imageElement = element.querySelector('img[src*="shopify"][src$=".png"], img.product-tile__image, img.product__image');
+  let imageUrl: string | undefined;
+  
+  if (imageElement) {
+    const src = imageElement.getAttribute('src') || '';
+    imageUrl = src.startsWith('http') ? src : `https:${src}`;
   }
   
   // If we have at least a heading or price, create a product
