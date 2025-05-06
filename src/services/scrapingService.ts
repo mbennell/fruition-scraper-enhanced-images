@@ -30,44 +30,81 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
     const doc = parser.parseFromString(html, "text/html");
     
     // Extract products based on common e-commerce patterns
-    // This is a simplified implementation that looks for product elements
     const products: Product[] = [];
     
-    // Find product containers
-    // This is a generic approach - real sites would need specific selectors
-    const productElements = doc.querySelectorAll(".product, .product-item, [data-product-id], .product-card");
+    // Extract product type from URL for relevance filtering
+    const urlLower = url.toLowerCase();
+    const isConditioner = urlLower.includes('conditioner');
+    const isShampoo = urlLower.includes('shampoo');
+    const productType = isConditioner ? 'Conditioner' : isShampoo ? 'Shampoo' : '';
     
-    if (productElements.length === 0) {
-      console.log("No product elements found, trying alternative selectors");
-      // Try alternative selectors if the common ones don't work
-      const alternativeElements = doc.querySelectorAll("article, .item, .card, li.grid-item");
-      if (alternativeElements.length > 0) {
-        // Convert NodeList to Array and then use forEach
-        Array.from(alternativeElements).forEach((element, index) => 
-          extractProductData(element, index, products, url)
-        );
+    console.log(`Looking for ${productType || 'hair products'}`);
+    
+    // First attempt: Look for specific product grid elements 
+    const productGrid = doc.querySelector('.collection-grid, .product-grid, .products-grid');
+    if (productGrid) {
+      console.log("Found product grid, extracting products");
+      const productItems = productGrid.querySelectorAll('.product-item, .grid__item, .product-card');
+      
+      if (productItems.length > 0) {
+        console.log(`Found ${productItems.length} product items in grid`);
+        Array.from(productItems).forEach((element, index) => {
+          extractProductData(element, index, products, url, productType);
+        });
       }
-    } else {
-      // Convert NodeList to Array and then use forEach
-      Array.from(productElements).forEach((element, index) => 
-        extractProductData(element, index, products, url)
-      );
     }
     
-    // If we still couldn't find products using specific selectors, try a more generic approach
+    // If no products found in grid, try other common selectors
+    if (products.length === 0) {
+      console.log("No products found in grid, trying alternative selectors");
+      // Find product containers
+      const productElements = doc.querySelectorAll(".product, .product-item, [data-product-id], .product-card");
+      
+      if (productElements.length > 0) {
+        console.log(`Found ${productElements.length} product elements`);
+        Array.from(productElements).forEach((element, index) => 
+          extractProductData(element, index, products, url, productType)
+        );
+      } else {
+        console.log("No product elements found, trying more general selectors");
+        // Try alternative selectors if the common ones don't work
+        const alternativeElements = doc.querySelectorAll("article, .item, .card, li.grid-item");
+        if (alternativeElements.length > 0) {
+          console.log(`Found ${alternativeElements.length} alternative elements`);
+          Array.from(alternativeElements).forEach((element, index) => 
+            extractProductData(element, index, products, url, productType)
+          );
+        }
+      }
+    }
+    
+    // If we still couldn't find products, try a more generic approach
     if (products.length === 0) {
       console.log("Using fallback generic scraping method");
       // Look for elements that might contain product information
       const possibleProducts = findPossibleProductElements(doc);
       Array.from(possibleProducts).forEach((element, index) => {
-        const product = createGenericProduct(element, index, url);
+        const product = createGenericProduct(element, index, url, productType);
         if (product) products.push(product);
       });
     }
     
-    console.log(`Scraping completed. Found ${products.length} products`);
+    // Filter out non-product items (search items, navigation, etc)
+    const filteredProducts = products.filter(product => {
+      // Filter out items with generic or search-related names
+      const lowerName = product.name.toLowerCase();
+      const isSearchItem = lowerName.includes('search') || 
+                           lowerName === 'item 1' || 
+                           lowerName === 'quick search' ||
+                           lowerName.includes('popular') ||
+                           product.name.length < 3;
+                          
+      return !isSearchItem;
+    });
     
-    return products.length > 0 ? products : generateFallbackProducts(url);
+    console.log(`Scraping completed. Found ${products.length} items, filtered to ${filteredProducts.length} products`);
+    
+    return filteredProducts.length > 0 ? filteredProducts : generateFallbackProducts(url);
   } catch (error) {
     console.error("Error during scraping:", error);
     // Return fallback products in case of error
@@ -76,9 +113,15 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
 };
 
 // Helper function to extract product data from an element
-const extractProductData = (element: Element, index: number, products: Product[], sourceUrl?: string): void => {
+const extractProductData = (
+  element: Element, 
+  index: number, 
+  products: Product[], 
+  sourceUrl?: string, 
+  productType?: string
+): void => {
   // Try to find product name
-  const nameElement = element.querySelector('.product-name, .product-title, h2, h3, h4, [data-product-name]');
+  const nameElement = element.querySelector('.product-name, .product-title, h2, h3, h4, [data-product-name], .title');
   
   // Try to find price
   const priceElement = element.querySelector('.price, .product-price, [data-price], .amount');
@@ -89,11 +132,18 @@ const extractProductData = (element: Element, index: number, products: Product[]
   // Try to find image
   const imageElement = element.querySelector('img');
   
-  // If we have at least name and price, create a product
+  // If we have at least name or price, create a product
   if (nameElement || priceElement) {
+    const name = nameElement?.textContent?.trim() || `Product ${index + 1}`;
+    
+    // Skip items that don't match our product type if specified
+    if (productType && !name.toLowerCase().includes(productType.toLowerCase())) {
+      return;
+    }
+    
     const product: Product = {
       id: `scraped-${index}`,
-      name: nameElement?.textContent?.trim() || `Product ${index + 1}`,
+      name: name,
       price: priceElement?.textContent?.trim() || 'Price not available',
       description: descriptionElement?.textContent?.trim() || 'No description available',
       sourceUrl: sourceUrl || '',
@@ -121,50 +171,45 @@ const extractProductData = (element: Element, index: number, products: Product[]
 };
 
 // Fallback function to find possible product elements generically
-const findPossibleProductElements = (doc: Document): Element[] => {
-  const elements: Element[] = [];
-  
+const findPossibleProductElements = (doc: Document): NodeListOf<Element> => {
   // Look for common container patterns
-  const containers = doc.querySelectorAll('div, section, li, article');
-  
-  // Convert NodeList to Array before using forEach
-  Array.from(containers).forEach((container) => {
-    // Check if this container might be a product
-    const hasImage = !!container.querySelector('img');
-    const hasHeading = !!container.querySelector('h1, h2, h3, h4, h5, h6');
-    // Fix the null reference issue by safely checking text content
-    let hasPrice = false;
-    const textNode = container.querySelector('*:not(script):not(style)');
-    if (textNode && textNode.textContent) {
-      hasPrice = !!textNode.textContent.match(/(\$|€|£)\s*\d+(\.\d{2})?/);
-    }
-    
-    // If it has at least 2 of these attributes, consider it a possible product
-    if ((hasImage && hasHeading) || (hasImage && hasPrice) || (hasHeading && hasPrice)) {
-      elements.push(container);
-    }
-  });
-  
-  return elements;
+  return doc.querySelectorAll('div, section, li, article');
 };
 
 // Create a generic product from any element that might be a product
-const createGenericProduct = (element: Element, index: number, sourceUrl?: string): Product | null => {
+const createGenericProduct = (
+  element: Element, 
+  index: number, 
+  sourceUrl?: string,
+  productType?: string
+): Product | null => {
   // Try to find a name (heading or prominent text)
   const heading = element.querySelector('h1, h2, h3, h4, h5, h6');
   
   // Look for price patterns
   const priceRegex = /(\$|€|£)\s*\d+(\.\d{2})?/;
-  const priceMatch = element.textContent?.match(priceRegex);
+  let priceMatch = null;
+  
+  // Check if element itself contains a price
+  if (element.textContent) {
+    priceMatch = element.textContent.match(priceRegex);
+  }
   
   // Find an image
   const image = element.querySelector('img');
   
   // If we have at least a heading or price, create a product
   if (heading || priceMatch) {
+    const name = heading?.textContent?.trim() || `Item ${index + 1}`;
+    
+    // Skip items that don't match our product type if specified
+    if (productType && !name.toLowerCase().includes(productType.toLowerCase())) {
+      return null;
+    }
+    
     const product: Product = {
       id: `generic-${index}`,
-      name: heading?.textContent?.trim() || `Item ${index + 1}`,
+      name: name,
       price: priceMatch ? priceMatch[0] : 'Price not found',
       description: extractTextContent(element, heading),
       sourceUrl: sourceUrl || '',
@@ -198,7 +243,6 @@ const extractTextContent = (element: Element, heading: Element | null): string =
   if (paragraphs.length > 0) {
     // Join text from all paragraphs
     let text = '';
-    // Convert NodeList to Array before using forEach
     Array.from(paragraphs).forEach((p) => {
       text += p.textContent?.trim() + ' ';
     });
@@ -222,9 +266,8 @@ const generateFallbackProducts = (url?: string): Product[] => {
   console.warn("Using fallback product data because scraping didn't return results");
   
   // Extract product type from URL for simulation purposes
-  const productType = url?.includes('Conditioner') ? 'Conditioner' : 'Shampoo';
+  const productType = url?.toLowerCase().includes('conditioner') ? 'Conditioner' : 'Shampoo';
   
-  // Use the same mock data as before for fallback
   return [
     {
       id: "1",
