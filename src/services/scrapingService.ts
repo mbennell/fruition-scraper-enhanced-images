@@ -42,12 +42,16 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
       // Try alternative selectors if the common ones don't work
       const alternativeElements = doc.querySelectorAll("article, .item, .card, li.grid-item");
       if (alternativeElements.length > 0) {
-        productElements.forEach = Array.prototype.forEach;
-        productElements.forEach.call(alternativeElements, (element, index) => extractProductData(element, index, products, url));
+        // Convert NodeList to Array and then use forEach
+        Array.from(alternativeElements).forEach((element, index) => 
+          extractProductData(element, index, products, url)
+        );
       }
     } else {
-      productElements.forEach = Array.prototype.forEach;
-      productElements.forEach.call(productElements, (element, index) => extractProductData(element, index, products, url));
+      // Convert NodeList to Array and then use forEach
+      Array.from(productElements).forEach((element, index) => 
+        extractProductData(element, index, products, url)
+      );
     }
     
     // If we still couldn't find products using specific selectors, try a more generic approach
@@ -123,8 +127,8 @@ const findPossibleProductElements = (doc: Document): Element[] => {
   // Look for common container patterns
   const containers = doc.querySelectorAll('div, section, li, article');
   
-  containers.forEach = Array.prototype.forEach;
-  containers.forEach.call(containers, (container) => {
+  // Convert NodeList to Array before using forEach
+  Array.from(containers).forEach((container) => {
     // Check if this container might be a product
     const hasImage = !!container.querySelector('img');
     const hasHeading = !!container.querySelector('h1, h2, h3, h4, h5, h6');
@@ -189,8 +193,8 @@ const extractTextContent = (element: Element, heading: Element | null): string =
   if (paragraphs.length > 0) {
     // Join text from all paragraphs
     let text = '';
-    paragraphs.forEach = Array.prototype.forEach;
-    paragraphs.forEach.call(paragraphs, (p) => {
+    // Convert NodeList to Array before using forEach
+    Array.from(paragraphs).forEach((p) => {
       text += p.textContent?.trim() + ' ';
     });
     return text.trim() || 'No description available';
