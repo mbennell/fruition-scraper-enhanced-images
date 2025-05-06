@@ -2,7 +2,7 @@
 import { Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Check, AlertTriangle, Info } from "lucide-react";
+import { Download, Check, AlertTriangle, Info, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { convertToSquareSpaceCSV, downloadSquareSpaceCSV } from "@/services/scrapingService";
 
@@ -70,9 +70,17 @@ const SquareSpaceCSVPreview = ({ products, maxRows = 5 }: SquareSpaceCSVPreviewP
           <Alert className="mb-4 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
             <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
             <AlertTitle>Using Thumbnail Images</AlertTitle>
-            <AlertDescription>
-              Using thumbnail images for all products. For modern websites with client-side rendering (like Shopify stores),
-              high-resolution images are often loaded dynamically and may require browser automation tools for extraction.
+            <AlertDescription className="space-y-2">
+              <p>Using thumbnail images for all products. Modern e-commerce sites like Shopify stores often:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Use client-side JavaScript to load high-resolution images</li>
+                <li>Implement anti-scraping measures to protect product content</li>
+                <li>Load images dynamically after the page renders</li>
+              </ul>
+              <p className="text-sm mt-2 pt-2 border-t border-blue-100 dark:border-blue-800">
+                <strong>Advanced solution:</strong> For full-quality image extraction, a server-side solution with browser automation 
+                tools like Puppeteer would be needed to fully render the pages.
+              </p>
             </AlertDescription>
           </Alert>
         )}

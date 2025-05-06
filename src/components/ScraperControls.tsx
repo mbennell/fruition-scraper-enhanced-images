@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, RefreshCw, History } from "lucide-react";
+import { Download, RefreshCw, History, Info } from "lucide-react";
 import { Product, ScrapingLog } from "@/types/product";
 import { convertToCSV, downloadCSV } from "@/services/scrapingService";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ScraperControlsProps {
   onScrape: (url: string) => void;
@@ -85,6 +86,23 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
               <Download className="h-4 w-4" />
               <span>Export CSV</span>
             </Button>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ml-auto hidden sm:flex"
+                >
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <span className="sr-only">Scraper information</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="end" className="max-w-xs">
+                <p>Current scraper uses client-side extraction which has limitations with modern websites. 
+                   For better results with sites like Shopify stores, a server with tools like Puppeteer would be needed.</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
           
           {scrapingLogs.length > 0 && (
@@ -111,7 +129,7 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
         </div>
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground border-t pt-4 flex flex-col items-start">
-        <p>Note: In this demo, product data is simulated. In a production environment, this would connect to a backend service that performs the actual web scraping.</p>
+        <p>Note: In this demo, product data is simulated for sites with anti-scraping measures. For production use, a backend service with browser automation would provide better results.</p>
       </CardFooter>
     </Card>
   );
