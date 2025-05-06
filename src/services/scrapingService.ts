@@ -59,7 +59,7 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
       console.log("Using fallback generic scraping method");
       // Look for elements that might contain product information
       const possibleProducts = findPossibleProductElements(doc);
-      possibleProducts.forEach((element, index) => {
+      Array.from(possibleProducts).forEach((element, index) => {
         const product = createGenericProduct(element, index, url);
         if (product) products.push(product);
       });
@@ -132,7 +132,12 @@ const findPossibleProductElements = (doc: Document): Element[] => {
     // Check if this container might be a product
     const hasImage = !!container.querySelector('img');
     const hasHeading = !!container.querySelector('h1, h2, h3, h4, h5, h6');
-    const hasPrice = !!container.querySelector('*:not(script):not(style)').textContent?.match(/(\$|€|£)\s*\d+(\.\d{2})?/);
+    // Fix the null reference issue by safely checking text content
+    let hasPrice = false;
+    const textNode = container.querySelector('*:not(script):not(style)');
+    if (textNode && textNode.textContent) {
+      hasPrice = !!textNode.textContent.match(/(\$|€|£)\s*\d+(\.\d{2})?/);
+    }
     
     // If it has at least 2 of these attributes, consider it a possible product
     if ((hasImage && hasHeading) || (hasImage && hasPrice) || (hasHeading && hasPrice)) {
