@@ -1,5 +1,4 @@
-
-import { Product } from "@/types/product";
+import { Product, SquareSpaceProduct } from "@/types/product";
 
 // Function to perform actual web scraping
 export const scrapeProducts = async (url?: string): Promise<Product[]> => {
@@ -422,7 +421,80 @@ export const convertToCSV = (products: Product[]): string => {
   return allRows.map(row => row.join(",")).join("\n");
 };
 
+export const convertToSquareSpaceCSV = (products: Product[]): string => {
+  // SquareSpace CSV header according to their import format
+  const header = [
+    "Product ID [Non Editable]", "Variant ID [Non Editable]", "Product Type [Non Editable]",
+    "Product Page", "Product URL", "Title", "Description", "SKU", 
+    "Option Name 1", "Option Value 1", "Option Name 2", "Option Value 2", 
+    "Option Name 3", "Option Value 3", "Option Name 4", "Option Value 4",
+    "Option Name 5", "Option Value 5", "Option Name 6", "Option Value 6",
+    "Price", "Sale Price", "On Sale", "Stock", "Categories", "Tags",
+    "Weight", "Length", "Width", "Height", "Visible", "Hosted Image URLs"
+  ];
+  
+  // Create rows for each product according to SquareSpace format
+  const rows = products.map(product => {
+    // Extract price as a number (removing currency symbol and formatting)
+    const priceStr = product.price.replace(/[^0-9.]/g, '');
+    const price = parseFloat(priceStr) || 0;
+    
+    // Determine category based on product name or extracted category
+    const category = product.category || 
+      (product.name.toLowerCase().includes('conditioner') ? 'Conditioner' : 
+       product.name.toLowerCase().includes('shampoo') ? 'Shampoo' : 'Hair Care');
+    
+    // Map our product to SquareSpace format
+    return [
+      "", // Product ID (left empty for new products)
+      "", // Variant ID (left empty for new products)
+      "PHYSICAL", // Product Type
+      "shop", // Product Page
+      "", // Product URL (left empty for new products)
+      `"${product.name.replace(/"/g, '""')}"`, // Title
+      `"${product.description.replace(/"/g, '""')}"`, // Description
+      "Leave Blank", // SKU
+      "", "", "", "", "", "", "", "", "", "", "", "", // All option fields empty
+      price.toString(), // Price
+      "0", // Sale Price
+      "No", // On Sale
+      "Unlimited", // Stock
+      category, // Categories
+      "", // Tags
+      "0", // Weight
+      "0", // Length
+      "0", // Width
+      "0", // Height
+      "Yes", // Visible
+      "" // Hosted Image URLs
+    ];
+  });
+  
+  // Combine header and rows
+  const allRows = [header, ...rows];
+  
+  // Join rows with newlines and columns with commas
+  return allRows.map(row => row.join(",")).join("\n");
+};
+
 export const downloadCSV = (csv: string, filename: string = "r-and-co-products.csv"): void => {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const downloadSquareSpaceCSV = (products: Product[]): void => {
+  const csv = convertToSquareSpaceCSV(products);
+  const filename = "squarespace-products.csv";
+  
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   

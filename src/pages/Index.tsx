@@ -5,6 +5,7 @@ import { scrapeProducts } from "@/services/scrapingService";
 import ScraperControls from "@/components/ScraperControls";
 import ProductTable from "@/components/ProductTable";
 import CSVPreview from "@/components/CSVPreview";
+import SquareSpaceCSVPreview from "@/components/SquareSpaceCSVPreview";
 import ScrapingInstructions from "@/components/ScrapingInstructions";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -89,7 +90,10 @@ const Index = () => {
             
             <ProductTable products={products} isLoading={isLoading} />
             
-            <CSVPreview products={products} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <CSVPreview products={products} />
+              <SquareSpaceCSVPreview products={products} />
+            </div>
           </div>
         </div>
       </main>
