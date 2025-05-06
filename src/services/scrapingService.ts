@@ -96,6 +96,13 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
       }
     }
     
+    // Add image extraction for all products
+    products.forEach(product => {
+      if (!product.imageUrl) {
+        product.imageUrl = findProductImage(doc, product.name);
+      }
+    });
+    
     // Filter out non-product items (search items, navigation, etc)
     const filteredProducts = products.filter(product => {
       // Filter out items with generic or search-related names
@@ -120,6 +127,43 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
   }
 };
 
+// Function to find product image - focusing on PNG images from Shopify 
+const findProductImage = (doc: Document, productName: string): string | undefined => {
+  console.log(`Looking for image for: ${productName}`);
+  
+  // Start with specific image search for the product
+  // Look for Shopify PNG images
+  const allImages = doc.querySelectorAll('img');
+  const shopifyImages = Array.from(allImages).filter(img => {
+    const src = img.getAttribute('src') || '';
+    return src.includes('shopify') && src.includes('.png') && 
+           (img.getAttribute('alt')?.toLowerCase().includes(productName.toLowerCase()) || 
+            img.closest('[class*="product"]'));
+  });
+  
+  if (shopifyImages.length > 0) {
+    console.log(`Found ${shopifyImages.length} Shopify PNG images for ${productName}`);
+    const imageUrl = shopifyImages[0].getAttribute('src') || '';
+    return imageUrl.startsWith('http') ? imageUrl : `https:${imageUrl}`;
+  }
+  
+  // Fallback to any product image
+  const productImages = Array.from(allImages).filter(img => {
+    const src = img.getAttribute('src') || '';
+    const alt = img.getAttribute('alt') || '';
+    return (src.includes('product') || alt.toLowerCase().includes('product') || 
+           alt.toLowerCase().includes(productName.toLowerCase())) && 
+           img.closest('[class*="product"]');
+  });
+  
+  if (productImages.length > 0) {
+    const imageUrl = productImages[0].getAttribute('src') || '';
+    return imageUrl.startsWith('http') ? imageUrl : `https:${imageUrl}`;
+  }
+  
+  return undefined;
+};
+
 // Helper function to extract product data from an element
 const extractProductData = (
   element: Element, 
@@ -137,6 +181,15 @@ const extractProductData = (
   // Try to find description
   const descriptionElement = element.querySelector('.description, .product-description, p, .ProductItem__Description');
   
+  // Try to find image - focusing on PNG from Shopify
+  const imageElement = element.querySelector('img[src*="shopify"][src$=".png"], img.product-tile__image, img.product__image');
+  let imageUrl: string | undefined;
+  
+  if (imageElement) {
+    const src = imageElement.getAttribute('src') || '';
+    imageUrl = src.startsWith('http') ? src : `https:${src}`;
+  }
+  
   // If we have at least name or price, create a product
   if (nameElement || priceElement) {
     const name = nameElement?.textContent?.trim() || `Product ${index + 1}`;
@@ -152,16 +205,11 @@ const extractProductData = (
       price: priceElement?.textContent?.trim() || 'Price not available',
       description: descriptionElement?.textContent?.trim() || 'No description available',
       sourceUrl: sourceUrl || '',
+      imageUrl: imageUrl
     };
     
     products.push(product);
   }
-};
-
-// Fallback function to find possible product elements generically
-const findPossibleProductElements = (doc: Document): NodeListOf<Element> => {
-  // Look for common container patterns that might contain product data
-  return doc.querySelectorAll('div[class*="product"], section, li, article, .card, [data-product-id]');
 };
 
 // Create a generic product from any element that might be a product
@@ -207,6 +255,7 @@ const createGenericProduct = (
       price: priceMatch ? priceMatch[0] : 'Price not found',
       description: extractTextContent(element, heading),
       sourceUrl: sourceUrl || '',
+      imageUrl: imageUrl
     };
     
     return product;
@@ -246,35 +295,39 @@ const generateFallbackProducts = (url?: string, count: number = 10): Product[] =
   // Extract product type from URL for simulation purposes
   const productType = url?.toLowerCase().includes('conditioner') ? 'Conditioner' : 'Shampoo';
   
-  // Base products to replicate
+  // Base products to replicate with images
   const baseProducts = [
     {
       id: "1",
       name: `DALLAS Biotin Thickening ${productType}`,
       price: "$32.00",
       description: `A thickening ${productType.toLowerCase()} with biotin that adds volume to fine, flat hair.`,
-      sourceUrl: url || ""
+      sourceUrl: url || "",
+      imageUrl: "https://cdn.shopify.com/s/files/1/0576/7888/9155/products/R_Co_WebAssets2021_DALLAS-Thickening-Shampoo_340x340.png"
     },
     {
       id: "2",
       name: `TELEVISION Perfect Hair ${productType}`,
       price: "$36.00",
       description: `A body-building ${productType.toLowerCase()} that creates incredible volume and thickness.`,
-      sourceUrl: url || ""
+      sourceUrl: url || "",
+      imageUrl: "https://cdn.shopify.com/s/files/1/0576/7888/9155/products/R_Co-TELEVISION-Shampoo-min_340x340.png"
     },
     {
       id: "3",
       name: `ATLANTIS Moisturizing ${productType}`,
       price: "$32.00",
       description: `A moisturizing ${productType.toLowerCase()} that tames frizz and adds shine.`,
-      sourceUrl: url || ""
+      sourceUrl: url || "",
+      imageUrl: "https://cdn.shopify.com/s/files/1/0576/7888/9155/products/R_Co_WebAssets2021_ATLANTIS-Moisturizing-Shampoo-min_340x340.png"
     },
     {
       id: "4",
       name: `BLEU Molecule Moisture ${productType}`,
       price: "$38.00",
       description: `A moisture ${productType.toLowerCase()} for extreme hydration.`,
-      sourceUrl: url || ""
+      sourceUrl: url || "",
+      imageUrl: "https://cdn.shopify.com/s/files/1/0576/7888/9155/products/R_Co_WebAssets2021_BLEU-Moisturizing-Shampoo-min_340x340.png"
     }
   ];
   
@@ -395,7 +448,9 @@ const generateFallbackProducts = (url?: string, count: number = 10): Product[] =
       name: template.name,
       price: template.price,
       description: template.description,
-      sourceUrl: url || ""
+      sourceUrl: url || "",
+      // Generate a placeholder image URL
+      imageUrl: `https://cdn.shopify.com/s/files/1/0576/7888/9155/products/R_Co_WebAssets2021_${template.name.split(' ')[0]}-${productType}_340x340.png`
     });
   }
   
@@ -453,7 +508,7 @@ export const convertToSquareSpaceCSV = (products: Product[]): string => {
       "", // Product URL (left empty for new products)
       `"${product.name.replace(/"/g, '""')}"`, // Title
       `"${product.description.replace(/"/g, '""')}"`, // Description
-      "Leave Blank", // SKU
+      "", // SKU (left blank as requested)
       "", "", "", "", "", "", "", "", "", "", "", "", // All option fields empty
       price.toString(), // Price
       "0", // Sale Price
@@ -466,7 +521,7 @@ export const convertToSquareSpaceCSV = (products: Product[]): string => {
       "0", // Width
       "0", // Height
       "Yes", // Visible
-      "" // Hosted Image URLs
+      product.imageUrl || "" // Hosted Image URLs
     ];
   });
   
