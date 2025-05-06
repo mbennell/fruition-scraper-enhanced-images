@@ -5,7 +5,7 @@ export interface Product {
   price: string;
   description: string;
   sourceUrl?: string;
-  imageUrl?: string;
+  imageUrl?: string; // Keeping this optional for data structure compatibility
   category?: string;
 }
 

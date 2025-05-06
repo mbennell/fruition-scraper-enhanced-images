@@ -1,4 +1,3 @@
-
 import { Product } from "@/types/product";
 
 // Function to perform actual web scraping
@@ -354,15 +353,14 @@ const generateFallbackProducts = (url?: string): Product[] => {
 
 export const convertToCSV = (products: Product[]): string => {
   // Add header row
-  const header = ["Product Name", "Price", "Description", "Source URL", "Image URL"];
+  const header = ["Product Name", "Price", "Description", "Source URL"];
   
   // Create rows for each product
   const rows = products.map(product => [
     `"${product.name.replace(/"/g, '""')}"`,
     `"${product.price.replace(/"/g, '""')}"`,
     `"${product.description.replace(/"/g, '""')}"`,
-    `"${product.sourceUrl?.replace(/"/g, '""') || ""}"`,
-    `"${product.imageUrl?.replace(/"/g, '""') || ""}"`
+    `"${product.sourceUrl?.replace(/"/g, '""') || ""}"`
   ]);
   
   // Combine header and rows
