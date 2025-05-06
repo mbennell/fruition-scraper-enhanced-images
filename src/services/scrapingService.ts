@@ -137,13 +137,14 @@ const enhanceProductsWithHighResImages = async (
   try {
     const urlObj = new URL(baseUrl);
     baseDomain = `${urlObj.protocol}//${urlObj.hostname}`;
+    console.log(`Base domain for URL resolution: ${baseDomain}`);
   } catch (e) {
     console.error("Invalid base URL:", baseUrl);
     return products;
   }
   
   // Process products in smaller batches to avoid overwhelming the browser
-  const batchSize = 3; // Reduced batch size for better reliability
+  const batchSize = 2; // Further reduced batch size for better reliability
   const enhancedProducts: Product[] = [];
   
   // Create batches of products to process
@@ -158,32 +159,73 @@ const enhanceProductsWithHighResImages = async (
         const productLink = findProductLink(doc, product.name, baseDomain);
         
         if (productLink) {
-          console.log(`Fetching detail page for: ${product.name} at ${productLink}`);
+          console.log(`Found product link for: ${product.name} at ${productLink}`);
           const encodedProductLink = encodeURIComponent(productLink);
           
           try {
+            console.log(`Attempting to fetch detail page via proxy: ${proxyUrl}${encodedProductLink}`);
             const detailResponse = await fetch(`${proxyUrl}${encodedProductLink}`);
+            
+            console.log(`Fetch response for ${product.name}: Status ${detailResponse.status} ${detailResponse.statusText}`);
             
             if (detailResponse.ok) {
               const detailHtml = await detailResponse.text();
+              console.log(`Successfully got HTML content for ${product.name} (${detailHtml.length} bytes)`);
+              
               const detailDoc = new DOMParser().parseFromString(detailHtml, "text/html");
               
               // Extract high-resolution image URL
+              console.log(`Searching for high-res image in HTML for ${product.name}`);
               const highResImage = extractHighResImage(detailDoc);
+              
               if (highResImage) {
-                console.log(`Found high-res image for ${product.name}: ${highResImage}`);
+                console.log(`SUCCESS: Found high-res image for ${product.name}: ${highResImage}`);
                 product.highResImageUrl = highResImage;
               } else {
-                console.log(`No high-res image found for ${product.name}`);
+                console.log(`No high-res image found for ${product.name} - image selectors didn't match`);
+                
+                // Debug: Log what elements we actually found
+                const pictureElements = detailDoc.querySelectorAll('picture');
+                console.log(`Found ${pictureElements.length} picture elements`);
+                
+                const featuredPicture = detailDoc.querySelector('picture.product-images__featured-picture');
+                console.log(`Featured picture element found: ${featuredPicture ? 'Yes' : 'No'}`);
+                
+                if (featuredPicture) {
+                  const sourceElements = featuredPicture.querySelectorAll('source');
+                  console.log(`Source elements in featured picture: ${sourceElements.length}`);
+                  
+                  Array.from(sourceElements).forEach((source, idx) => {
+                    console.log(`Source ${idx} srcset: ${source.getAttribute('srcset')}`);
+                    console.log(`Source ${idx} media: ${source.getAttribute('media')}`);
+                  });
+                  
+                  const imgElement = featuredPicture.querySelector('img');
+                  if (imgElement) {
+                    console.log(`Featured img srcset: ${imgElement.getAttribute('srcset')}`);
+                    console.log(`Featured img src: ${imgElement.getAttribute('src')}`);
+                  }
+                }
               }
             } else {
-              console.error(`Error fetching detail page for ${product.name}: ${detailResponse.status}`);
+              console.error(`Error fetching detail page for ${product.name}: ${detailResponse.status} ${detailResponse.statusText}`);
             }
           } catch (fetchError) {
             console.error(`Fetch error for ${product.name}:`, fetchError);
           }
         } else {
           console.log(`No product link found for ${product.name}`);
+          
+          // Debug why we couldn't find the link
+          console.log(`Looking for product links similar to "${product.name}"`);
+          const allLinks = doc.querySelectorAll('a[href*="/products/"]');
+          console.log(`Found ${allLinks.length} product links in total`);
+          
+          // Log a few sample links to see what we're finding
+          const sampleLinks = Array.from(allLinks).slice(0, 3);
+          sampleLinks.forEach((link, idx) => {
+            console.log(`Sample link ${idx}: ${link.getAttribute('href')} - Text: "${link.textContent?.trim()}"`);
+          });
         }
         
         return product;
@@ -199,17 +241,26 @@ const enhanceProductsWithHighResImages = async (
     
     // Add a larger delay between batches to prevent rate limiting
     if (i + batchSize < products.length) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const delayTime = 1500; // Increased delay to 1.5 seconds
+      console.log(`Waiting ${delayTime}ms before processing next batch...`);
+      await new Promise(resolve => setTimeout(resolve, delayTime));
     }
   }
+  
+  // Summary of results
+  const highResCount = enhancedProducts.filter(p => p.highResImageUrl).length;
+  console.log(`Enhancement complete. Found high-res images for ${highResCount} of ${enhancedProducts.length} products (${Math.round((highResCount/enhancedProducts.length)*100)}%)`);
   
   return enhancedProducts;
 };
 
 // Function to find a product link in the document
 const findProductLink = (doc: Document, productName: string, baseDomain: string): string | null => {
+  console.log(`Searching for link to product: "${productName}"`);
+  
   // Look specifically for product tile links which are used on R+Co site
   const productTileLinks = doc.querySelectorAll('a.product-tile__link');
+  console.log(`Found ${productTileLinks.length} product tile links`);
   
   for (const link of Array.from(productTileLinks)) {
     const href = link.getAttribute('href');
@@ -218,6 +269,8 @@ const findProductLink = (doc: Document, productName: string, baseDomain: string)
     const altText = imgElement?.getAttribute('alt') || '';
     
     if (href && altText.toLowerCase().includes(productName.toLowerCase())) {
+      console.log(`Found matching product link for "${productName}" with href: ${href}`);
+      
       // Handle relative URLs
       if (href.startsWith('/')) {
         return `${baseDomain}${href}`;
@@ -228,6 +281,9 @@ const findProductLink = (doc: Document, productName: string, baseDomain: string)
       }
     }
   }
+  
+  // If product tile links don't work, try all links with titles or content that match
+  console.log(`Trying alternative link detection for "${productName}"`);
   
   // Fallback to more general product link detection
   const allLinks = doc.querySelectorAll('a[href*="/products/"]');
@@ -241,6 +297,8 @@ const findProductLink = (doc: Document, productName: string, baseDomain: string)
         (linkText.toLowerCase().includes(productName.toLowerCase()) || 
          link.innerHTML.toLowerCase().includes(productName.toLowerCase()))) {
       
+      console.log(`Found matching product link via content for "${productName}" with href: ${href}`);
+      
       // Handle relative URLs
       if (href.startsWith('/')) {
         return `${baseDomain}${href}`;
@@ -252,19 +310,25 @@ const findProductLink = (doc: Document, productName: string, baseDomain: string)
     }
   }
   
+  console.log(`No matching links found for "${productName}"`);
   return null;
 };
 
 // Function to extract high-resolution image from product detail page
 const extractHighResImage = (doc: Document): string | undefined => {
+  console.log("Looking for high-resolution image in product detail page");
+  
   // First look for the featured picture element
   const featuredPicture = doc.querySelector('picture.product-images__featured-picture');
   
   if (featuredPicture) {
+    console.log("Found featured picture element");
+    
     // First try to get the high-resolution source (for desktop)
     const sourceElement = featuredPicture.querySelector('source[media="(min-width: 768px)"]');
     if (sourceElement && sourceElement.hasAttribute('srcset')) {
       const srcset = sourceElement.getAttribute('srcset') || '';
+      console.log(`Found desktop high-res source: ${srcset}`);
       // Handle URLs that start with // by adding https:
       return srcset.startsWith('//') ? `https:${srcset}` : srcset;
     }
@@ -273,6 +337,7 @@ const extractHighResImage = (doc: Document): string | undefined => {
     const anySource = featuredPicture.querySelector('source');
     if (anySource && anySource.hasAttribute('srcset')) {
       const srcset = anySource.getAttribute('srcset') || '';
+      console.log(`Found generic source: ${srcset}`);
       return srcset.startsWith('//') ? `https:${srcset}` : srcset;
     }
     
@@ -280,23 +345,31 @@ const extractHighResImage = (doc: Document): string | undefined => {
     const imgElement = featuredPicture.querySelector('img');
     if (imgElement && imgElement.hasAttribute('srcset')) {
       const srcset = imgElement.getAttribute('srcset') || '';
+      console.log(`Found image srcset: ${srcset}`);
       return srcset.startsWith('//') ? `https:${srcset}` : srcset;
     }
     
     // Fall back to src attribute if srcset is not available
     if (imgElement && imgElement.hasAttribute('src')) {
       const src = imgElement.getAttribute('src') || '';
+      console.log(`Falling back to image src: ${src}`);
       return src.startsWith('//') ? `https:${src}` : src;
     }
+    
+    console.log("No suitable image source found in featured picture");
+  } else {
+    console.log("No featured picture element found");
   }
   
   // If we can't find the featured picture, look for any large product image
   const productImage = doc.querySelector('.product-images__main img, .product__image img');
   if (productImage) {
     const src = productImage.getAttribute('src') || productImage.getAttribute('srcset') || '';
+    console.log(`Found alternative product image: ${src}`);
     return src.startsWith('//') ? `https:${src}` : src;
   }
   
+  console.log("No high-resolution image found");
   return undefined;
 };
 
