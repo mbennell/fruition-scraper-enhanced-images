@@ -5,7 +5,8 @@ export interface Product {
   price: string;
   description: string;
   sourceUrl?: string;
-  imageUrl?: string; // Keeping this optional for data structure compatibility
+  imageUrl?: string; // Thumbnail image
+  highResImageUrl?: string; // Added high-resolution image URL
   category?: string;
   sku?: string; // Added for SquareSpace compatibility
 }

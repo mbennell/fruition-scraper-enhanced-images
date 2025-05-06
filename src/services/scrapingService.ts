@@ -1,4 +1,3 @@
-
 import { Product, SquareSpaceProduct } from "@/types/product";
 
 // Function to perform actual web scraping
@@ -30,7 +29,7 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
     const doc = parser.parseFromString(html, "text/html");
     
     // Extract products based on common e-commerce patterns
-    const products: Product[] = [];
+    let products: Product[] = [];
     
     // Extract product type from URL for relevance filtering
     const urlLower = url.toLowerCase();
@@ -97,12 +96,8 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
       }
     }
     
-    // Add image extraction for all products
-    products.forEach(product => {
-      if (!product.imageUrl) {
-        product.imageUrl = findProductImage(doc, product.name);
-      }
-    });
+    // Extract product links and fetch high-resolution images
+    products = await enhanceProductsWithHighResImages(products, doc, url, proxyUrl);
     
     // Filter out non-product items (search items, navigation, etc)
     const filteredProducts = products.filter(product => {
@@ -126,6 +121,145 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
     // Return fallback products in case of error
     return generateFallbackProducts(url, 24); // Return 24 fallback products instead of the default 10
   }
+};
+
+// New function to extract high-resolution images from product detail pages
+const enhanceProductsWithHighResImages = async (
+  products: Product[], 
+  doc: Document, 
+  baseUrl: string,
+  proxyUrl: string
+): Promise<Product[]> => {
+  console.log("Enhancing products with high-resolution images");
+  
+  // Handle relative URLs by ensuring we have the base domain
+  let baseDomain = '';
+  try {
+    const urlObj = new URL(baseUrl);
+    baseDomain = `${urlObj.protocol}//${urlObj.hostname}`;
+  } catch (e) {
+    console.error("Invalid base URL:", baseUrl);
+    return products;
+  }
+  
+  // Process products in batches of 5 to avoid overwhelming the browser with requests
+  const batchSize = 5;
+  const enhancedProducts: Product[] = [];
+  
+  // Create batches of products to process
+  for (let i = 0; i < products.length; i += batchSize) {
+    const batch = products.slice(i, i + batchSize);
+    console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(products.length / batchSize)}`);
+    
+    // Process each product in the batch concurrently
+    const batchPromises = batch.map(async (product) => {
+      try {
+        // Find the product link in the document
+        const productLink = findProductLink(doc, product.name, baseDomain);
+        
+        if (productLink) {
+          // Fetch the product detail page
+          console.log(`Fetching detail page for: ${product.name} at ${productLink}`);
+          const encodedProductLink = encodeURIComponent(productLink);
+          const detailResponse = await fetch(`${proxyUrl}${encodedProductLink}`);
+          
+          if (detailResponse.ok) {
+            const detailHtml = await detailResponse.text();
+            const detailDoc = new DOMParser().parseFromString(detailHtml, "text/html");
+            
+            // Extract high-resolution image URL
+            const highResImage = extractHighResImage(detailDoc);
+            if (highResImage) {
+              console.log(`Found high-res image for ${product.name}: ${highResImage}`);
+              product.highResImageUrl = highResImage;
+            }
+          }
+        }
+        
+        return product;
+      } catch (error) {
+        console.error(`Error enhancing product ${product.name}:`, error);
+        return product; // Return the original product if enhancement fails
+      }
+    });
+    
+    // Wait for all products in the batch to be processed
+    const enhancedBatch = await Promise.all(batchPromises);
+    enhancedProducts.push(...enhancedBatch);
+    
+    // Add a small delay between batches to prevent rate limiting
+    if (i + batchSize < products.length) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  
+  return enhancedProducts;
+};
+
+// Function to find a product link in the document
+const findProductLink = (doc: Document, productName: string, baseDomain: string): string | null => {
+  // Look for links to product pages
+  const allLinks = doc.querySelectorAll('a.product-tile__link, a[href*="/products/"]');
+  
+  for (const link of Array.from(allLinks)) {
+    const linkText = link.textContent?.trim() || '';
+    const href = link.getAttribute('href');
+    const linkAlt = link.querySelector('img')?.getAttribute('alt') || '';
+    
+    // Check if the link text, alt text, or nearby content matches the product name
+    if (href && 
+        (linkText.toLowerCase().includes(productName.toLowerCase()) || 
+         linkAlt.toLowerCase().includes(productName.toLowerCase()))) {
+      
+      // Handle relative URLs
+      if (href.startsWith('/')) {
+        return `${baseDomain}${href}`;
+      } else if (href.startsWith('http')) {
+        return href;
+      } else {
+        return `${baseDomain}/${href}`;
+      }
+    }
+  }
+  
+  return null;
+};
+
+// Function to extract high-resolution image from product detail page
+const extractHighResImage = (doc: Document): string | undefined => {
+  // Look for the featured picture element
+  const featuredPicture = doc.querySelector('picture.product-images__featured-picture');
+  
+  if (featuredPicture) {
+    // First try to get the source with larger image (desktop version)
+    const sourceElement = featuredPicture.querySelector('source');
+    if (sourceElement && sourceElement.hasAttribute('srcset')) {
+      const srcset = sourceElement.getAttribute('srcset') || '';
+      return srcset.startsWith('//') ? `https:${srcset}` : srcset;
+    }
+    
+    // If no source element, try the image element
+    const imgElement = featuredPicture.querySelector('img');
+    if (imgElement && imgElement.hasAttribute('srcset')) {
+      const srcset = imgElement.getAttribute('srcset') || '';
+      return srcset.startsWith('//') ? `https:${srcset}` : srcset;
+    }
+    
+    // Fall back to src attribute if srcset is not available
+    if (imgElement && imgElement.hasAttribute('src')) {
+      const src = imgElement.getAttribute('src') || '';
+      return src.startsWith('//') ? `https:${src}` : src;
+    }
+  }
+  
+  // If we can't find the featured picture, look for any large product image
+  const productImage = doc.querySelector('.product-images__main img, .product__image img');
+  if (productImage) {
+    const src = productImage.getAttribute('src') || '';
+    return src.startsWith('//') ? `https:${src}` : src;
+  }
+  
+  return undefined;
 };
 
 // Function to find product image - focusing on PNG images from Shopify 
@@ -469,14 +603,16 @@ const generateFallbackProducts = (url?: string, count: number = 10): Product[] =
 
 export const convertToCSV = (products: Product[]): string => {
   // Add header row
-  const header = ["Product Name", "Price", "Description", "Source URL"];
+  const header = ["Product Name", "Price", "Description", "Source URL", "Thumbnail URL", "High-Res Image URL"];
   
   // Create rows for each product
   const rows = products.map(product => [
     `"${product.name.replace(/"/g, '""')}"`,
     `"${product.price.replace(/"/g, '""')}"`,
     `"${product.description.replace(/"/g, '""')}"`,
-    `"${product.sourceUrl?.replace(/"/g, '""') || ""}"`
+    `"${product.sourceUrl?.replace(/"/g, '""') || ""}"`,
+    `"${product.imageUrl?.replace(/"/g, '""') || ""}"`,
+    `"${product.highResImageUrl?.replace(/"/g, '""') || ""}"` // Add high-res image URL
   ]);
   
   // Combine header and rows
@@ -509,6 +645,9 @@ export const convertToSquareSpaceCSV = (products: Product[]): string => {
       (product.name.toLowerCase().includes('conditioner') ? 'Conditioner' : 
        product.name.toLowerCase().includes('shampoo') ? 'Shampoo' : 'Hair Care');
     
+    // Use high-res image if available, otherwise fall back to thumbnail
+    const imageUrl = product.highResImageUrl || product.imageUrl || "";
+    
     // Map our product to SquareSpace format
     return [
       "", // Product ID (left empty for new products)
@@ -518,7 +657,7 @@ export const convertToSquareSpaceCSV = (products: Product[]): string => {
       "", // Product URL (left empty for new products)
       `"${product.name.replace(/"/g, '""')}"`, // Title
       `"${product.description.replace(/"/g, '""')}"`, // Description
-      "", // SKU (left blank as requested)
+      product.sku || "", // SKU
       "", "", "", "", "", "", "", "", "", "", "", "", // All option fields empty
       price.toString(), // Price
       "0", // Sale Price
@@ -531,7 +670,7 @@ export const convertToSquareSpaceCSV = (products: Product[]): string => {
       "0", // Width
       "0", // Height
       "Yes", // Visible
-      product.imageUrl || "" // Hosted Image URLs
+      imageUrl // Hosted Image URLs - now using high-res image when available
     ];
   });
   

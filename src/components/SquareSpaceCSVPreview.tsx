@@ -19,6 +19,10 @@ const SquareSpaceCSVPreview = ({ products, maxRows = 5 }: SquareSpaceCSVPreviewP
   const lines = csv.split("\n");
   const previewLines = lines.slice(0, maxRows + 1); // Header + maxRows
   const hasMoreLines = lines.length > previewLines.length;
+  
+  // Count how many products have high-res images
+  const highResImageCount = products.filter(p => p.highResImageUrl).length;
+  const highResPercentage = products.length > 0 ? Math.round((highResImageCount / products.length) * 100) : 0;
 
   return (
     <Card className="w-full mt-6">
@@ -27,6 +31,11 @@ const SquareSpaceCSVPreview = ({ products, maxRows = 5 }: SquareSpaceCSVPreviewP
           <CardTitle>SquareSpace CSV Preview</CardTitle>
           <CardDescription>
             Preview of the CSV file formatted for SquareSpace import
+            {highResImageCount > 0 && (
+              <span className="block text-sm mt-1">
+                Found high-resolution images for {highResImageCount} of {products.length} products ({highResPercentage}%)
+              </span>
+            )}
           </CardDescription>
         </div>
         <Button 
@@ -43,6 +52,11 @@ const SquareSpaceCSVPreview = ({ products, maxRows = 5 }: SquareSpaceCSVPreviewP
         <div className="p-4 bg-gray-50 rounded-md overflow-x-auto">
           <p className="text-sm text-muted-foreground mb-2">
             This format is compatible with SquareSpace's product import tool.
+            {highResImageCount > 0 && (
+              <span className="block mt-1">
+                High-resolution images will be used when available.
+              </span>
+            )}
           </p>
           <pre className="text-xs md:text-sm">
             {previewLines.join("\n")}
