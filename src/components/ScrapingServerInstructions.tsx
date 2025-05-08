@@ -74,7 +74,7 @@ const ScrapingServerInstructions: React.FC = () => {
               <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
                 <li>The server-side scraper will only work when deployed to an environment that supports Node.js and Puppeteer</li>
                 <li>Puppeteer requires specific dependencies that may need to be installed on your server</li>
-                <li>For Vercel, use Node.js runtime >= 18.x</li>
+                <li>For Vercel, use Node.js runtime {'>='} 18.x</li>
                 <li>Consider serverless function timeout limits (typical limit is 10-60 seconds)</li>
                 <li>Scraping commercial websites may violate their terms of service - use responsibly and only for educational purposes</li>
               </ul>
