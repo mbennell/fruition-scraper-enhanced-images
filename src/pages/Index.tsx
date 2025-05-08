@@ -22,6 +22,7 @@ const Index = () => {
       setIsLoading(true);
       setLastError(null);
       
+      console.log(`Starting scraping process for: ${url}`);
       const scrapedProducts = await scrapeProducts(url);
       setProducts(scrapedProducts);
       
@@ -51,10 +52,15 @@ const Index = () => {
       
       setLastError(errorMessage);
       
+      // Check if this is a fallback case (which isn't really an error)
+      const isFallbackCase = errorMessage.includes("fallback");
+      
       toast({
-        title: "Scraping failed",
-        description: errorMessage,
-        variant: "destructive",
+        title: isFallbackCase ? "Using demo products" : "Scraping failed",
+        description: isFallbackCase 
+          ? "Using simulated product data due to site anti-scraping measures."
+          : errorMessage,
+        variant: isFallbackCase ? "default" : "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -89,6 +95,7 @@ const Index = () => {
             products={products}
             lastScraped={lastScraped}
             scrapingLogs={scrapingLogs}
+            lastError={lastError}
           />
           
           <div className="space-y-4">

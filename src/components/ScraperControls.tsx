@@ -8,6 +8,7 @@ import { convertToCSV, downloadCSV } from "@/services/scrapingService";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 interface ScraperControlsProps {
   onScrape: (url: string) => void;
@@ -15,11 +16,18 @@ interface ScraperControlsProps {
   products: Product[];
   lastScraped: Date | null;
   scrapingLogs: ScrapingLog[];
+  lastError: string | null;
 }
 
-const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingLogs }: ScraperControlsProps) => {
+const ScraperControls = ({ 
+  onScrape, 
+  isLoading, 
+  products, 
+  lastScraped, 
+  scrapingLogs,
+  lastError 
+}: ScraperControlsProps) => {
   const [url, setUrl] = useState("https://www.randco.com/collections/all");
-  const [lastError, setLastError] = useState<string | null>(null);
   
   const handleExportCSV = () => {
     const csv = convertToCSV(products);
@@ -27,14 +35,23 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
   };
 
   const handleScrape = () => {
-    setLastError(null);
     onScrape(url);
   };
+
+  // Determine if products are real or fallback demo products
+  const isUsingDemoProducts = products.length > 0 && lastError?.includes("fallback");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Fruition Product Scraper</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Fruition Product Scraper</span>
+          {isUsingDemoProducts && (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+              Demo Mode
+            </Badge>
+          )}
+        </CardTitle>
         <CardDescription>
           Extract product information from e-commerce websites
         </CardDescription>
@@ -62,10 +79,20 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
             </div>
           </div>
           
-          {lastError && (
+          {lastError && !lastError.includes("fallback") && (
             <Alert variant="destructive" className="mb-4 py-2">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription className="text-sm">{lastError}</AlertDescription>
+            </Alert>
+          )}
+
+          {isUsingDemoProducts && (
+            <Alert variant="warning" className="mb-4 py-2 bg-amber-50 text-amber-700 border-amber-200">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Using demo products because the site couldn't be scraped directly. 
+                This is normal for sites with modern anti-scraping measures.
+              </AlertDescription>
             </Alert>
           )}
           
