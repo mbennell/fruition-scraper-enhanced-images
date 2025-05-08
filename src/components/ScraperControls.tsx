@@ -87,7 +87,7 @@ const ScraperControls = ({
           )}
 
           {isUsingDemoProducts && (
-            <Alert variant="warning" className="mb-4 py-2 bg-amber-50 text-amber-700 border-amber-200">
+            <Alert variant="default" className="mb-4 py-2 bg-amber-50 text-amber-700 border-amber-200">
               <Info className="h-4 w-4" />
               <AlertDescription className="text-sm">
                 Using demo products because the site couldn't be scraped directly. 
