@@ -11,52 +11,80 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Code } from 'lucide-react';
+import { Code, Server, ExternalLink } from 'lucide-react';
 
 const ScrapingServerInstructions: React.FC = () => {
   return (
     <div className="space-y-4">
       <Alert className="bg-blue-50 border-blue-200">
-        <Code className="h-4 w-4 text-blue-500" />
-        <AlertTitle>Setting up the server-side scraper</AlertTitle>
+        <Server className="h-4 w-4 text-blue-500" />
+        <AlertTitle>Deployment Required for Server-Side Scraping</AlertTitle>
         <AlertDescription className="mt-2">
-          This app now includes server-side scraping capabilities for better results with modern e-commerce sites.
-          Follow the instructions below to set up and use the server-side scraper.
+          This app requires deployment to a Node.js environment to use the server-side scraper functionality.
+          The preview environment does not support running Puppeteer for web scraping.
         </AlertDescription>
       </Alert>
 
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="setup">
-          <AccordionTrigger>Setup Instructions</AccordionTrigger>
+          <AccordionTrigger>Deployment Instructions</AccordionTrigger>
           <AccordionContent className="space-y-4">
             <div className="space-y-2">
-              <h3 className="font-medium">1. Install Puppeteer</h3>
-              <div className="bg-gray-100 p-3 rounded font-mono text-sm">
-                npm install puppeteer
-              </div>
+              <h3 className="font-medium">Option 1: Deploy to Vercel (Recommended)</h3>
               <p className="text-sm text-muted-foreground">
-                Puppeteer is required for the server-side scraper to work properly.
+                Vercel provides serverless functions that can run Puppeteer in a Node.js environment.
               </p>
+              <ol className="list-decimal list-inside text-sm space-y-2 pl-2">
+                <li>Export this project from Lovable to your GitHub</li>
+                <li>Create a new project on Vercel and connect it to your GitHub repo</li>
+                <li>Add the following to your Vercel project settings:</li>
+                <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
+                  <p>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</p>
+                  <p>PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable</p>
+                </div>
+                <li>Deploy your project</li>
+              </ol>
             </div>
 
             <div className="space-y-2">
-              <h3 className="font-medium">2. Set Up API Route</h3>
-              <p className="text-sm">
-                Ensure the <code>/api/scrape</code> route is properly set up. For most frameworks:
+              <h3 className="font-medium">Option 2: Run Locally</h3>
+              <p className="text-sm text-muted-foreground">
+                You can also run the project locally with Node.js:
               </p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>Next.js - Make sure the api/scrape.js file is in the pages/api folder</li>
-                <li>Express - Set up the route in your server.js file</li>
-                <li>For pure static sites - Consider using a serverless function (Vercel, Netlify, etc.)</li>
-              </ul>
+              <ol className="list-decimal list-inside text-sm space-y-2 pl-2">
+                <li>Clone the project to your local machine</li>
+                <li>Install dependencies:
+                  <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
+                    npm install
+                  </div>
+                </li>
+                <li>Start the development server:
+                  <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
+                    npm run dev
+                  </div>
+                </li>
+              </ol>
             </div>
             
-            <div className="space-y-2">
-              <h3 className="font-medium">3. Test the Scraper</h3>
-              <p className="text-sm text-muted-foreground">
-                Enter a URL in the scraper controls and click "Start Scraping" to test if the server-side scraper is working.
-                If you see actual product data (not demo products), the server-side scraper is working correctly.
-              </p>
+            <div className="space-y-2 bg-amber-50 border border-amber-200 rounded p-4 mt-4">
+              <h3 className="font-medium flex items-center gap-1 text-amber-700">
+                <Code className="h-4 w-4" />
+                Important Notes About Deployment
+              </h3>
+              <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
+                <li>The server-side scraper will only work when deployed to an environment that supports Node.js and Puppeteer</li>
+                <li>Puppeteer requires specific dependencies that may need to be installed on your server</li>
+                <li>For Vercel, use Node.js runtime >= 18.x</li>
+                <li>Consider serverless function timeout limits (typical limit is 10-60 seconds)</li>
+                <li>Scraping commercial websites may violate their terms of service - use responsibly and only for educational purposes</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center gap-1 text-sm text-blue-600 mt-2">
+              <ExternalLink className="h-4 w-4" />
+              <a href="https://vercel.com/guides/deploying-puppeteer-with-vercel" target="_blank" rel="noopener noreferrer">
+                Read more about deploying Puppeteer on Vercel
+              </a>
             </div>
           </AccordionContent>
         </AccordionItem>
