@@ -2,11 +2,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, RefreshCw, History, Info } from "lucide-react";
+import { Download, RefreshCw, History, Info, AlertTriangle } from "lucide-react";
 import { Product, ScrapingLog } from "@/types/product";
 import { convertToCSV, downloadCSV } from "@/services/scrapingService";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ScraperControlsProps {
   onScrape: (url: string) => void;
@@ -17,7 +18,8 @@ interface ScraperControlsProps {
 }
 
 const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingLogs }: ScraperControlsProps) => {
-  const [url, setUrl] = useState("https://www.randco.com/collections/all?pf_pt_type=Shampoo");
+  const [url, setUrl] = useState("https://www.randco.com/collections/all");
+  const [lastError, setLastError] = useState<string | null>(null);
   
   const handleExportCSV = () => {
     const csv = convertToCSV(products);
@@ -25,6 +27,7 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
   };
 
   const handleScrape = () => {
+    setLastError(null);
     onScrape(url);
   };
 
@@ -47,10 +50,24 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
               className="w-full"
               placeholder="Enter product collection URL"
             />
-            <p className="text-xs text-muted-foreground">
-              Example: https://www.randco.com/collections/all?pf_pt_type=Conditioner
-            </p>
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                Examples:
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
+                <li>https://www.randco.com/collections/all</li>
+                <li>https://www.randco.com/collections/all?pf_pt_type=Conditioner</li>
+                <li>https://www.randco.com/collections/bleu-shop-all</li>
+              </ul>
+            </div>
           </div>
+          
+          {lastError && (
+            <Alert variant="destructive" className="mb-4 py-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-sm">{lastError}</AlertDescription>
+            </Alert>
+          )}
           
           {lastScraped && (
             <p className="text-xs text-muted-foreground">
@@ -87,22 +104,24 @@ const ScraperControls = ({ onScrape, isLoading, products, lastScraped, scrapingL
               <span>Export CSV</span>
             </Button>
             
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="ml-auto hidden sm:flex"
-                >
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                  <span className="sr-only">Scraper information</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="end" className="max-w-xs">
-                <p>Current scraper uses client-side extraction which has limitations with modern websites. 
-                   For better results with sites like Shopify stores, a server with tools like Puppeteer would be needed.</p>
-              </TooltipContent>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto hidden sm:flex"
+                  >
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span className="sr-only">Scraper information</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" className="max-w-xs">
+                  <p>Current scraper uses client-side extraction which has limitations with modern websites. 
+                     For better results with sites like Shopify stores, a server with tools like Puppeteer would be needed.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           
           {scrapingLogs.length > 0 && (

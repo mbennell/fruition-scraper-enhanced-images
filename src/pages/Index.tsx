@@ -14,11 +14,14 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastScraped, setLastScraped] = useState<Date | null>(null);
   const [scrapingLogs, setScrapingLogs] = useState<ScrapingLog[]>([]);
+  const [lastError, setLastError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleScrape = async (url: string) => {
     try {
       setIsLoading(true);
+      setLastError(null);
+      
       const scrapedProducts = await scrapeProducts(url);
       setProducts(scrapedProducts);
       
@@ -40,9 +43,17 @@ const Index = () => {
       });
     } catch (error) {
       console.error("Error during scraping:", error);
+      
+      let errorMessage = "There was an error while scraping the products.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      setLastError(errorMessage);
+      
       toast({
         title: "Scraping failed",
-        description: "There was an error while scraping the products. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
