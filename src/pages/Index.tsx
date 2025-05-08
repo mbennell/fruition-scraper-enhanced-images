@@ -8,6 +8,7 @@ import CSVPreview from "@/components/CSVPreview";
 import SquareSpaceCSVPreview from "@/components/SquareSpaceCSVPreview";
 import ScrapingInstructions from "@/components/ScrapingInstructions";
 import { useToast } from "@/components/ui/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 const Index = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -38,9 +39,15 @@ const Index = () => {
       
       setScrapingLogs(prevLogs => [newLog, ...prevLogs]);
       
+      // Determine if we're using demo products
+      const isUsingDemoProducts = scrapedProducts.some(p => p.isDemo);
+      
       toast({
-        title: "Scraping completed",
-        description: `Successfully scraped ${scrapedProducts.length} products from ${url}.`,
+        title: isUsingDemoProducts ? "Using demo products" : "Scraping completed",
+        description: isUsingDemoProducts 
+          ? `Using simulated product data for ${url} due to server configuration or anti-scraping measures.`
+          : `Successfully scraped ${scrapedProducts.length} products from ${url}.`,
+        variant: isUsingDemoProducts ? "default" : "default",
       });
     } catch (error) {
       console.error("Error during scraping:", error);
@@ -58,7 +65,7 @@ const Index = () => {
       toast({
         title: isFallbackCase ? "Using demo products" : "Scraping failed",
         description: isFallbackCase 
-          ? "Using simulated product data due to site anti-scraping measures."
+          ? "Using simulated product data due to site anti-scraping measures or server configuration."
           : errorMessage,
         variant: isFallbackCase ? "default" : "destructive",
       });
@@ -82,7 +89,12 @@ const Index = () => {
                 Fruition Product Scraper
               </h1>
             </div>
-            <ScrapingInstructions />
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                With Server-Side Scraping
+              </Badge>
+              <ScrapingInstructions />
+            </div>
           </div>
         </div>
       </header>
@@ -102,7 +114,7 @@ const Index = () => {
             <h2 className="text-xl font-semibold">Scraped Products</h2>
             <p className="text-sm text-muted-foreground">
               {products.length > 0 
-                ? `Showing ${products.length} products from the collection.`
+                ? `Showing ${products.length} products from the collection.${products.some(p => p.isDemo) ? ' (Demo products)' : ''}`
                 : "Start scraping to see products here."}
             </p>
             

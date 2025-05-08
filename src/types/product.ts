@@ -9,6 +9,7 @@ export interface Product {
   highResImageUrl?: string; // Added high-resolution image URL
   category?: string;
   sku?: string; // Added for SquareSpace compatibility
+  isDemo?: boolean; // Flag to indicate if this is a demo product
 }
 
 export interface ScrapingLog {
