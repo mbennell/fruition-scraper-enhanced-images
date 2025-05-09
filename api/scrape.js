@@ -1,3 +1,4 @@
+
 // Server-side scraping endpoint using Puppeteer
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
@@ -34,7 +35,16 @@ export default async function handler(req, res) {
         '--disable-extensions',
         '--disable-component-extensions-with-background-pages',
         '--disable-default-apps',
-        '--mute-audio'
+        '--mute-audio',
+        // Additional optimization flags
+        '--single-process',
+        '--no-zygote',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-sync',
+        '--metrics-recording-only',
       ],
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
