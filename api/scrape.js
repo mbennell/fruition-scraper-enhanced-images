@@ -16,10 +16,17 @@ export default async function handler(req, res) {
   console.log(`Scraping started for: ${url}`);
   
   try {
-    // 1. Launch headless Chromium
+    // 1. Launch headless Chromium with special Vercel serverless configuration
     const browser = await chromium.launch({ 
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-setuid-sandbox',
+        '--no-sandbox',
+        '--no-zygote',
+        '--single-process'
+      ]
     });
     
     console.log('Browser launched successfully');
@@ -112,7 +119,7 @@ export default async function handler(req, res) {
       console.log('No products found, returning error');
       return res.status(404).json({ 
         success: false, 
-        message: 'No products found.',
+        message: 'No products found on the page. Try a different URL or contact support.',
         screenshot: `data:image/jpeg;base64,${Buffer.from(screenshot).toString('base64')}`
       });
     }
@@ -197,8 +204,7 @@ export default async function handler(req, res) {
     await csvWriter.writeRecords(records);
     console.log(`CSV written to ${csvPath}`);
 
-    // 6. Instead of download link (which won't work in serverless), return products directly
-    // We'll handle the CSV conversion client-side
+    // 6. Return CSV data directly instead of relying on fallback
     res.status(200).json({
       success: true,
       products: products,
@@ -207,13 +213,19 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Scraping error:', error);
+    
+    // Provide detailed error information to help with debugging
+    const errorDetails = {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+      type: 'Playwright error'
+    };
+    
     res.status(500).json({ 
       success: false, 
-      message: error.message,
-      errorDetails: {
-        name: error.name,
-        stack: error.stack
-      }
+      message: 'Server-side scraping failed. This is likely due to Vercel serverless function limitations. Please see the detailed error message below.',
+      error: errorDetails
     });
   }
 }
