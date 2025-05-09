@@ -1,7 +1,7 @@
 
 // Server-side scraping endpoint using Puppeteer
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 // Configure Chrome for serverless environment
 chromium.setGraphicsMode = false;
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   
   try {
     // Launch Puppeteer with appropriate options for serverless environments
-    const browser = await puppeteer.launch({
+    const browser = await puppeteerCore.launch({
       args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars', '--disable-web-security'],
       defaultViewport: chromium.defaultViewport,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (await chromium.executablePath()),
