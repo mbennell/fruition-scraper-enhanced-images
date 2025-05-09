@@ -1,7 +1,7 @@
 
 // api/scrape.js
-import { chromium } from 'playwright';
-import { createObjectCsvWriter } from 'csv-writer';
+import chromium from '@sparticuz/chromium';
+import { chromium as playwright } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 
@@ -16,32 +16,13 @@ export default async function handler(req, res) {
   console.log(`Scraping started for: ${url}`);
   
   try {
-    // Launch Chromium with reduced memory usage
-    const browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--no-zygote',
-        '--single-process',
-        '--disable-background-networking',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-client-side-phishing-detection',
-        '--disable-component-update',
-        '--disable-sync',
-        '--metrics-recording-only',
-        '--mute-audio',
-        '--no-default-browser-check',
-        '--no-first-run',
-        '--disable-default-apps',
-        '--disable-popup-blocking',
-        '--disable-extensions'
-      ]
+    // Launch browser with @sparticuz/chromium for Vercel compatibility
+    const browser = await playwright.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
+      defaultViewport: { width: 1280, height: 720 }
     });
     
     console.log('Browser launched successfully');
@@ -55,11 +36,11 @@ export default async function handler(req, res) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     console.log('Page loaded, waiting for product elements');
     
-    // Take an initial screenshot for debugging
-    const screenshot = await page.screenshot({ type: 'jpeg', quality: 50 }); // Reduced quality
+    // Take an initial screenshot for debugging (reduced quality)
+    const screenshot = await page.screenshot({ type: 'jpeg', quality: 30 });
     console.log('Screenshot taken');
 
-    // 2. More efficient product selector for different Shopify themes
+    // More efficient product selector for different Shopify themes
     const productSelectors = [
       '.product-card',
       '.grid__item',
@@ -83,10 +64,10 @@ export default async function handler(req, res) {
       
       // Use evaluateHandle for more memory efficiency
       products = await page.$$eval(selector, items => {
-        return items.slice(0, 50).map(item => { // Limit to 50 products max to save memory
+        return items.slice(0, 20).map(item => { // Limit to 20 products max to save memory
           // Try different possible selectors for product elements
-          const title = item.querySelector('.product-card__title, .product-item__title, .product-title, .title, h2, h3')?.textContent.trim() || 'Unknown Product';
-          const description = item.querySelector('.product-card__description, .product-item__description, .description, p:not(.product-card__price)')?.textContent.trim() || '';
+          const title = item.querySelector('.product-card__title, .product-item__title, .product-title, .title, h2, h3')?.textContent?.trim() || 'Unknown Product';
+          const description = item.querySelector('.product-card__description, .product-item__description, .description, p:not(.product-card__price)')?.textContent?.trim() || '';
           
           // Get image URL (try multiple possible selectors)
           let imageUrl = '';
@@ -131,7 +112,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Skip CSV writer creation to save memory, just return the products
+    // Return the products directly
     res.status(200).json({
       success: true,
       products: products

@@ -174,12 +174,15 @@ export const scrapeProducts = async (url: string): Promise<Product[]> => {
       body: JSON.stringify({ url }),
     });
     
-    const data = await response.json();
-    
     if (!response.ok) {
-      console.error("Scraping failed:", data);
-      throw new Error(data.message || 'Failed to scrape products');
+      const errorData = await response.json().catch(() => ({
+        message: `Server returned ${response.status}: ${response.statusText}`
+      }));
+      console.error("Scraping failed:", errorData);
+      throw new Error(errorData.message || `Failed to scrape products: ${response.statusText}`);
     }
+    
+    const data = await response.json();
     
     if (!data.success) {
       throw new Error(data.message || 'Failed to scrape products');
@@ -188,11 +191,11 @@ export const scrapeProducts = async (url: string): Promise<Product[]> => {
     // Map the response data to our Product type
     return data.products.map((item: any) => ({
       id: generateId(),
-      name: item.Title,
-      description: item.Description,
-      price: item.Price,
-      imageUrl: item['Hosted Image URLs'],
-      url: item['Product URL']
+      name: item.Title || 'Unknown Product',
+      description: item.Description || '',
+      price: item.Price || '',
+      imageUrl: item['Hosted Image URLs'] || '',
+      sourceUrl: item['Product URL'] || url
     }));
   } catch (error) {
     // Log the error and re-throw it
