@@ -35,6 +35,8 @@ export default async function handler(req, res) {
         '--single-process',
         '--no-zygote',
       ],
+      headless: true, // Explicit headless mode
+      ignoreHTTPSErrors: true,
     });
     
     console.log('Chrome launched successfully');
