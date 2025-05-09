@@ -12,8 +12,7 @@
   },
   "build": {
     "env": {
-      "PLAYWRIGHT_BROWSERS_PATH": "0",
-      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+      "PLAYWRIGHT_BROWSERS_PATH": "0"
     }
   },
   "headers": [

@@ -10,7 +10,7 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
     // Display loading state
     console.log("Starting scraping process for:", url);
     
-    // Use our new backend API service to scrape products
+    // Use our backend API service to scrape products
     const response = await fetch('/api/scrape', {
       method: 'POST',
       headers: {
@@ -27,10 +27,22 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
     
     const data = await response.json();
     
-    // If we have products, return them
+    // If we have products, convert them to our Product format
     if (data.products && data.products.length > 0) {
       console.log(`Scraping completed. Found ${data.products.length} products.`);
-      return data.products;
+      
+      // Convert from API format to our application's format
+      const convertedProducts = data.products.map((p: any, index: number) => ({
+        id: `scraped-${index}`,
+        name: p.Title || 'Unknown Product',
+        price: p.Price || 'Price not available',
+        description: p.Description || 'No description available',
+        imageUrl: p['Hosted Image URLs'] || '',
+        highResImageUrl: p['Hosted Image URLs'] || '',
+        sourceUrl: p['Product URL'] || url,
+      }));
+      
+      return convertedProducts;
     } else {
       throw new Error("No products found or fallback to demo products");
     }
@@ -39,7 +51,7 @@ export const scrapeProducts = async (url?: string): Promise<Product[]> => {
     console.error("Error during scraping:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     
-    // Always generate fallback products, but pass along information about the error
+    // Generate fallback products if scraping fails
     const fallbackProducts = generateFallbackProducts(url, 24, errorMessage);
     return fallbackProducts; 
   }

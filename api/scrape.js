@@ -1,238 +1,219 @@
 
-// Server-side scraping endpoint using Playwright with optimized serverless configuration
-import { chromium } from 'playwright-core';
-import chromiumBinary from '@sparticuz/chromium';
+// api/scrape.js
+import { chromium } from 'playwright';
+import { createObjectCsvWriter } from 'csv-writer';
+import fs from 'fs';
+import path from 'path';
 
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
+  
+  const { url, category = '', tags = '' } = req.body;
+  if (!url) return res.status(400).json({ message: 'URL is required' });
 
-  const { url } = req.body;
-  
-  if (!url) {
-    return res.status(400).json({ message: 'URL is required' });
-  }
-  
-  console.log(`Server-side scraping started for: ${url}`);
+  console.log(`Scraping started for: ${url}`);
   
   try {
-    // Set Chromium executable path for serverless environment
-    chromiumBinary.setGraphicsMode('swiftshader');
-    
-    console.log('Attempting to launch Chrome using Playwright with @sparticuz/chromium');
-    
-    // Launch browser with serverless-optimized settings
-    const browser = await chromium.launch({
-      executablePath: await chromiumBinary.executablePath(),
-      args: [
-        ...chromiumBinary.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-features=IsolateOrigins',
-        '--disable-site-isolation-trials',
-      ],
+    // 1. Launch headless Chromium
+    const browser = await chromium.launch({ 
       headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     
-    console.log('Chrome launched successfully');
-    
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 800 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    });
-    
-    const page = await context.newPage();
+    console.log('Browser launched successfully');
+    const page = await browser.newPage();
     
     // Enable console logging for debugging
     page.on('console', msg => console.log('PAGE CONSOLE:', msg.text()));
     
     console.log(`Navigating to: ${url}`);
-    
-    // Navigate to the URL with a timeout
-    await page.goto(url, { 
-      waitUntil: 'networkidle',
-      timeout: 30000 
-    });
-    
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     console.log('Page loaded, waiting for product elements');
     
-    // Take an initial screenshot
-    const initialScreenshot = await page.screenshot({
-      type: "jpeg",
-      quality: 80,
-      fullPage: false,
-    });
+    // Take an initial screenshot for debugging
+    const screenshot = await page.screenshot({ type: 'jpeg', quality: 80 });
+    console.log('Screenshot taken');
+
+    // 2. More flexible product selector for different Shopify themes
+    const productSelectors = [
+      '.product-card',
+      '.grid__item',
+      '.productCard',
+      '.product-item',
+      '.collection-product',
+      '.product',
+      '.ProductItem',
+      '[data-product-id]'
+    ];
     
-    // Extract products using Playwright's evaluate
-    console.log('Attempting to extract products');
-    const products = await page.evaluate(() => {
-      // Helper function to extract text safely
-      const extractText = (element) => element ? element.textContent.trim() : '';
+    let products = [];
+    
+    // Try each selector until we find products
+    for (const selector of productSelectors) {
+      console.log(`Trying selector: ${selector}`);
       
-      // Different selectors for different e-commerce platforms
-      const productSelectors = [
-        '.product-item, .ProductItem', // Shopify & SquareSpace
-        '.product-card, .product', // WooCommerce & Other
-        'article[data-product-id], div[data-product-id]', // Generic product IDs
-        '.product-grid__item', // Additional R+Co specific selector
-        '.grid__item', // Common Shopify selector
-        '.collection-product'
-      ];
+      // Check if selector exists on page
+      const hasSelector = await page.$(selector);
+      if (!hasSelector) continue;
       
-      let productElements = [];
-      
-      // Try different selectors
-      for (const selector of productSelectors) {
-        const elements = document.querySelectorAll(selector);
-        if (elements.length > 0) {
-          console.log(`Found ${elements.length} products with selector: ${selector}`);
-          productElements = Array.from(elements);
-          break;
-        }
-      }
-      
-      // If we still don't have products, try looking in product grids
-      if (productElements.length === 0) {
-        console.log('No products found with standard selectors, trying grid containers');
-        const grids = document.querySelectorAll('.product-grid, .products, .collection-products, .collection__products, .grid--view-items');
-        if (grids.length > 0) {
-          for (const grid of grids) {
-            const items = grid.querySelectorAll('li, .grid__item, .grid-item, > div');
-            if (items.length > 0) {
-              console.log(`Found ${items.length} products in grid container`);
-              productElements = Array.from(items);
-              break;
+      products = await page.$$eval(selector, items => {
+        return items.map(item => {
+          // Try different possible selectors for product elements
+          const title = item.querySelector('.product-card__title, .product-item__title, .product-title, .title, h2, h3')?.textContent.trim() || 'Unknown Product';
+          const description = item.querySelector('.product-card__description, .product-item__description, .description, p:not(.product-card__price)')?.textContent.trim() || '';
+          
+          // Get image URL (try multiple possible selectors)
+          let imageUrl = '';
+          const img = item.querySelector('img');
+          if (img) {
+            // Try to get high-res version first
+            imageUrl = img.dataset.src || img.getAttribute('data-srcset') || img.srcset || img.src || '';
+            
+            // If we have srcset, get the largest image
+            if (img.srcset) {
+              const srcsetItems = img.srcset.split(',');
+              if (srcsetItems.length > 0) {
+                const lastItem = srcsetItems[srcsetItems.length - 1].trim().split(' ')[0];
+                if (lastItem) imageUrl = lastItem;
+              }
             }
           }
-        }
-      }
-      
-      // If we still don't have products, try a more aggressive approach
-      if (productElements.length === 0) {
-        console.log('No products found in grids, trying generic product detection');
-        // Look for elements with product-like attributes
-        const possibleProducts = document.querySelectorAll('a[href*="product"], div:has(img):has(.price)');
-        if (possibleProducts.length > 0) {
-          productElements = Array.from(possibleProducts);
-        }
-      }
-      
-      console.log(`Total products found: ${productElements.length}`);
-      
-      return productElements.map((element, index) => {
-        // Find product name
-        const nameElement = element.querySelector('h2, h3, h4, .product-name, .product-title, .title, [class*="title"], [class*="name"], .product-item__title, .card-title');
-        
-        // Find price
-        const priceElement = element.querySelector('.price, .product-price, [class*="price"], [data-price], .product-item__price');
-        
-        // Find description
-        const descElement = element.querySelector('.description, [class*="description"], p:not(.price):not([class*="price"]):not([class*="title"]):not([class*="name"])');
-        
-        // Find link to product page
-        const linkElement = element.querySelector('a');
-        const productUrl = linkElement ? linkElement.href : null;
-        
-        // Find image
-        const imgElement = element.querySelector('img');
-        const img = imgElement ? imgElement.getAttribute('src') || imgElement.getAttribute('data-src') : null;
-        const imageUrl = img ? new URL(img, window.location.origin).href : null;
-        
-        // Find high-res image if available
-        let highResImageUrl = null;
-        if (imgElement) {
-          const srcset = imgElement.getAttribute('srcset');
-          if (srcset) {
-            const srcsetItems = srcset.split(',');
-            const lastItem = srcsetItems[srcsetItems.length - 1].trim().split(' ')[0];
-            if (lastItem) {
-              highResImageUrl = new URL(lastItem, window.location.origin).href;
-            }
-          }
-        }
-        
-        // Attempt to use higher resolution versions if available
-        if ((imageUrl && imageUrl.includes("_small.")) || (imageUrl && imageUrl.includes("_medium."))) {
-          highResImageUrl = imageUrl.replace("_small.", "_large.").replace("_medium.", "_large.");
-        }
-        
-        const name = extractText(nameElement) || `Product ${index + 1}`;
-        const price = extractText(priceElement) || 'Price not available';
-        const description = extractText(descElement) || 'No description available';
-        
-        return {
-          id: `scraped-${index}`,
-          name,
-          price,
-          description,
-          imageUrl,
-          highResImageUrl: highResImageUrl || imageUrl,
-          sourceUrl: productUrl || window.location.href
-        };
+          
+          // Get product URL
+          let productUrl = '';
+          const link = item.querySelector('a');
+          if (link) productUrl = link.href;
+          
+          // Get price (try multiple possible selectors)
+          const priceElement = item.querySelector('.product-card__price, .price, .product-item__price, [class*="price"]');
+          const price = priceElement ? priceElement.textContent.trim().replace(/\s+/g, ' ') : '';
+          
+          return {
+            Title: title,
+            Description: description,
+            'Hosted Image URLs': imageUrl,
+            'Product URL': productUrl,
+            Price: price
+          };
+        });
       });
-    });
-    
-    // Take a final screenshot for debugging purposes
-    const screenshot = await page.screenshot({
-      type: "jpeg",
-      quality: 80,
-      fullPage: false,
-    });
-    
-    // Close browser correctly to release resources
+      
+      console.log(`Found ${products.length} products with selector: ${selector}`);
+      
+      if (products.length > 0) break;
+    }
+
     await browser.close();
-    
-    console.log(`Server-side scraping completed. Found ${products.length} products.`);
-    
-    // Check if we found any products
+    console.log('Browser closed');
+
     if (products.length === 0) {
-      console.log('No products found, returning initial screenshot for debugging');
-      return res.status(404).json({
-        success: false,
-        message: "No products found on the page",
-        screenshot: `data:image/jpeg;base64,${Buffer.from(initialScreenshot).toString("base64")}`,
-        fallback: true
+      console.log('No products found, returning error');
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No products found.',
+        screenshot: `data:image/jpeg;base64,${Buffer.from(screenshot).toString('base64')}`
       });
     }
-    
-    // Return the scraped products
-    return res.status(200).json({ 
-      success: true, 
-      products: products.filter(p => p.name && p.name !== 'undefined'),
-      screenshot: `data:image/jpeg;base64,${Buffer.from(screenshot).toString("base64")}`
+
+    // 3. Prepare CSV writer (matching Squarespace template)
+    const csvPath = path.join('/tmp', 'shopify_to_squarespace.csv');
+    const csvWriter = createObjectCsvWriter({
+      path: csvPath,
+      header: [
+        { id: 'Product ID [Non Editable]', title: 'Product ID [Non Editable]' },
+        { id: 'Variant ID [Non Editable]', title: 'Variant ID [Non Editable]' },
+        { id: 'Product Type [Non Editable]', title: 'Product Type [Non Editable]' },
+        { id: 'Product Page', title: 'Product Page' },
+        { id: 'Product URL', title: 'Product URL' },
+        { id: 'Title', title: 'Title' },
+        { id: 'Description', title: 'Description' },
+        { id: 'SKU', title: 'SKU' },
+        { id: 'Option Name 1', title: 'Option Name 1' },
+        { id: 'Option Value 1', title: 'Option Value 1' },
+        { id: 'Option Name 2', title: 'Option Name 2' },
+        { id: 'Option Value 2', title: 'Option Value 2' },
+        { id: 'Option Name 3', title: 'Option Name 3' },
+        { id: 'Option Value 3', title: 'Option Value 3' },
+        { id: 'Option Name 4', title: 'Option Name 4' },
+        { id: 'Option Value 4', title: 'Option Value 4' },
+        { id: 'Option Name 5', title: 'Option Name 5' },
+        { id: 'Option Value 5', title: 'Option Value 5' },
+        { id: 'Option Name 6', title: 'Option Name 6' },
+        { id: 'Option Value 6', title: 'Option Value 6' },
+        { id: 'Price', title: 'Price' },
+        { id: 'Sale Price', title: 'Sale Price' },
+        { id: 'On Sale', title: 'On Sale' },
+        { id: 'Stock', title: 'Stock' },
+        { id: 'Categories', title: 'Categories' },
+        { id: 'Tags', title: 'Tags' },
+        { id: 'Weight', title: 'Weight' },
+        { id: 'Length', title: 'Length' },
+        { id: 'Width', title: 'Width' },
+        { id: 'Height', title: 'Height' },
+        { id: 'Visible', title: 'Visible' },
+        { id: 'Hosted Image URLs', title: 'Hosted Image URLs' }
+      ]
     });
-    
+
+    // 4. Map scraped data into template rows
+    const records = products.map(p => ({
+      'Product ID [Non Editable]': '',
+      'Variant ID [Non Editable]': '',
+      'Product Type [Non Editable]': 'PHYSICAL',
+      'Product Page': 'shop',
+      'Product URL': p['Product URL'],
+      'Title': p.Title,
+      'Description': p.Description,
+      'SKU': '',
+      'Option Name 1': '',
+      'Option Value 1': '',
+      'Option Name 2': '',
+      'Option Value 2': '',
+      'Option Name 3': '',
+      'Option Value 3': '',
+      'Option Name 4': '',
+      'Option Value 4': '',
+      'Option Name 5': '',
+      'Option Value 5': '',
+      'Option Name 6': '',
+      'Option Value 6': '',
+      'Price': p.Price,
+      'Sale Price': '',
+      'On Sale': 'No',
+      'Stock': 'Unlimited',
+      'Categories': category,
+      'Tags': tags,
+      'Weight': '0',
+      'Length': '0',
+      'Width': '0',
+      'Height': '0',
+      'Visible': 'Yes',
+      'Hosted Image URLs': p['Hosted Image URLs']
+    }));
+
+    // 5. Write CSV
+    await csvWriter.writeRecords(records);
+    console.log(`CSV written to ${csvPath}`);
+
+    // 6. Instead of download link (which won't work in serverless), return products directly
+    // We'll handle the CSV conversion client-side
+    res.status(200).json({
+      success: true,
+      products: products,
+      csvData: fs.readFileSync(csvPath, 'utf8')
+    });
+
   } catch (error) {
-    console.error('Error during server-side scraping:', error);
-    
-    // Get detailed error information for debugging
-    let errorDetails = {
-      name: error.name,
-      stack: error.stack,
-      isVercel: !!process.env.VERCEL
-    };
-    
-    // Add environment information for debugging
-    if (process.env.VERCEL) {
-      try {
-        const { execSync } = require('child_process');
-        const lsOutput = execSync('ls -la /tmp').toString();
-        const depsOutput = execSync('ldd $(which node) | grep -i "not found"').toString();
-        errorDetails.lsOutput = lsOutput;
-        errorDetails.missingDeps = depsOutput;
-      } catch (e) {
-        errorDetails.debugError = e.message;
-      }
-    }
-    
-    return res.status(500).json({ 
+    console.error('Scraping error:', error);
+    res.status(500).json({ 
       success: false, 
-      message: `Failed to scrape products: ${error.message}`,
-      errorDetails,
-      fallback: true
+      message: error.message,
+      errorDetails: {
+        name: error.name,
+        stack: error.stack
+      }
     });
   }
 }
