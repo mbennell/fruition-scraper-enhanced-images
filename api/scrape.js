@@ -1,4 +1,3 @@
-
 // Server-side scraping endpoint using Puppeteer
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
@@ -21,36 +20,29 @@ export default async function handler(req, res) {
   console.log(`Server-side scraping started for: ${url}`);
   
   try {
-    // Determine if we're running in a serverless environment (like Vercel)
-    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION;
-    console.log(`Running in serverless environment: ${isServerless ? 'Yes' : 'No'}`);
-    
-    // Launch Puppeteer with appropriate options for serverless environments
-    let executablePath;
-    
-    if (isServerless) {
-      // In serverless environments, always use @sparticuz/chromium
-      executablePath = await chromium.executablePath();
-      console.log(`Using Sparticuz Chromium for serverless: ${executablePath}`);
-    } else if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      // In non-serverless environments, try using the specified Chrome executable
-      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-      console.log(`Using Chrome from environment variable: ${executablePath}`);
-    } else {
-      // Fallback to @sparticuz/chromium
-      executablePath = await chromium.executablePath();
-      console.log(`Using Chrome from @sparticuz/chromium: ${executablePath}`);
-    }
-    
-    console.log(`Attempting to use Chrome at path: ${executablePath}`);
+    // Launch browser with optimized serverless settings
+    console.log('Attempting to launch Chrome using @sparticuz/chromium');
     
     const browser = await puppeteerCore.launch({
-      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars', '--disable-web-security'],
+      args: [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-features=IsolateOrigins',
+        '--disable-site-isolation-trials',
+        '--disable-extensions',
+        '--disable-component-extensions-with-background-pages',
+        '--disable-default-apps',
+        '--mute-audio'
+      ],
       defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: true,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
       ignoreHTTPSErrors: true,
     });
+    
+    console.log('Chrome launched successfully');
     
     const page = await browser.newPage();
     
