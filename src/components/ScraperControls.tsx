@@ -41,20 +41,11 @@ const ScraperControls = ({
     onScrape(url);
   };
 
-  // Determine if products are demo products
-  const isUsingDemoProducts = products.some(p => p.isDemo) || 
-                             (products.length > 0 && lastError?.includes("fallback"));
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Fruition Product Scraper</span>
-          {isUsingDemoProducts && (
-            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-              Demo Mode
-            </Badge>
-          )}
         </CardTitle>
         <CardDescription>
           Extract product information from e-commerce websites
@@ -89,20 +80,10 @@ const ScraperControls = ({
               </div>
             </div>
             
-            {lastError && !lastError.includes("fallback") && (
+            {lastError && (
               <Alert variant="destructive" className="mb-4 py-2">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="text-sm">{lastError}</AlertDescription>
-              </Alert>
-            )}
-
-            {isUsingDemoProducts && (
-              <Alert variant="default" className="mb-4 py-2 bg-amber-50 text-amber-700 border-amber-200">
-                <Info className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  Using demo products because the site couldn't be scraped directly. 
-                  This may be because the server-side scraper isn't set up yet or because the site has strong anti-scraping measures.
-                </AlertDescription>
               </Alert>
             )}
             
@@ -154,7 +135,7 @@ const ScraperControls = ({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="end" className="max-w-xs">
-                    <p>This scraper uses Puppeteer for server-side extraction of product data.
+                    <p>This scraper uses Playwright for server-side extraction of product data.
                        For best results, ensure the server-side API is properly configured.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -190,7 +171,7 @@ const ScraperControls = ({
         </Tabs>
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground border-t pt-4 flex flex-col items-start">
-        <p>Note: For best results, use the server-side scraper which can extract data from most modern e-commerce sites. If the server-side scraper is not configured, demo products will be shown.</p>
+        <p>Note: For best results, use the server-side scraper on a properly configured Vercel environment. Make sure @sparticuz/chromium is properly installed.</p>
       </CardFooter>
     </Card>
   );

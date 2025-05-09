@@ -22,6 +22,7 @@ const Index = () => {
     try {
       setIsLoading(true);
       setLastError(null);
+      setProducts([]); // Clear previous products
       
       console.log(`Starting scraping process for: ${url}`);
       const scrapedProducts = await scrapeProducts(url);
@@ -39,15 +40,10 @@ const Index = () => {
       
       setScrapingLogs(prevLogs => [newLog, ...prevLogs]);
       
-      // Determine if we're using demo products
-      const isUsingDemoProducts = scrapedProducts.some(p => p.isDemo);
-      
       toast({
-        title: isUsingDemoProducts ? "Using demo products" : "Scraping completed",
-        description: isUsingDemoProducts 
-          ? `Using simulated product data for ${url} due to server configuration or anti-scraping measures.`
-          : `Successfully scraped ${scrapedProducts.length} products from ${url}.`,
-        variant: isUsingDemoProducts ? "default" : "default",
+        title: "Scraping completed",
+        description: `Successfully scraped ${scrapedProducts.length} products from ${url}.`,
+        variant: "default",
       });
     } catch (error) {
       console.error("Error during scraping:", error);
@@ -59,15 +55,10 @@ const Index = () => {
       
       setLastError(errorMessage);
       
-      // Check if this is a fallback case (which isn't really an error)
-      const isFallbackCase = errorMessage.includes("fallback");
-      
       toast({
-        title: isFallbackCase ? "Using demo products" : "Scraping failed",
-        description: isFallbackCase 
-          ? "Using simulated product data due to site anti-scraping measures or server configuration."
-          : errorMessage,
-        variant: isFallbackCase ? "default" : "destructive",
+        title: "Scraping failed",
+        description: errorMessage,
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -114,7 +105,7 @@ const Index = () => {
             <h2 className="text-xl font-semibold">Scraped Products</h2>
             <p className="text-sm text-muted-foreground">
               {products.length > 0 
-                ? `Showing ${products.length} products from the collection.${products.some(p => p.isDemo) ? ' (Demo products)' : ''}`
+                ? `Showing ${products.length} products from the collection.`
                 : "Start scraping to see products here."}
             </p>
             

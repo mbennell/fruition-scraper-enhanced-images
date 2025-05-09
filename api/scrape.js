@@ -1,6 +1,7 @@
 
 // api/scrape.js
 import { chromium } from 'playwright';
+import chromiumExtra from '@sparticuz/chromium';
 import { createObjectCsvWriter } from 'csv-writer';
 import fs from 'fs';
 import path from 'path';
@@ -16,17 +17,11 @@ export default async function handler(req, res) {
   console.log(`Scraping started for: ${url}`);
   
   try {
-    // 1. Launch headless Chromium with special Vercel serverless configuration
+    // 1. Launch headless Chromium with special Vercel serverless configuration using @sparticuz/chromium
     const browser = await chromium.launch({ 
       headless: true,
-      args: [
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-        '--disable-setuid-sandbox',
-        '--no-sandbox',
-        '--no-zygote',
-        '--single-process'
-      ]
+      executablePath: await chromiumExtra.executablePath(),
+      args: chromiumExtra.args,
     });
     
     console.log('Browser launched successfully');
