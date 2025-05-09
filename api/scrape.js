@@ -1,3 +1,4 @@
+
 // Server-side scraping endpoint using Puppeteer
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
@@ -20,13 +21,23 @@ export default async function handler(req, res) {
   console.log(`Server-side scraping started for: ${url}`);
   
   try {
+    // Determine if we're running in a serverless environment (like Vercel)
+    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION;
+    console.log(`Running in serverless environment: ${isServerless ? 'Yes' : 'No'}`);
+    
     // Launch Puppeteer with appropriate options for serverless environments
     let executablePath;
     
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    if (isServerless) {
+      // In serverless environments, always use @sparticuz/chromium
+      executablePath = await chromium.executablePath();
+      console.log(`Using Sparticuz Chromium for serverless: ${executablePath}`);
+    } else if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      // In non-serverless environments, try using the specified Chrome executable
       executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
       console.log(`Using Chrome from environment variable: ${executablePath}`);
     } else {
+      // Fallback to @sparticuz/chromium
       executablePath = await chromium.executablePath();
       console.log(`Using Chrome from @sparticuz/chromium: ${executablePath}`);
     }
@@ -256,6 +267,11 @@ export default async function handler(req, res) {
     return res.status(500).json({ 
       success: false, 
       message: `Failed to scrape products: ${error.message}`,
+      errorDetails: {
+        name: error.name,
+        stack: error.stack,
+        isVercel: !!process.env.VERCEL
+      },
       fallback: true
     });
   }

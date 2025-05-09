@@ -40,7 +40,17 @@ const ScrapingServerInstructions: React.FC = () => {
                 <li>Add the following to your Vercel project settings under Environment Variables:</li>
                 <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
                   <p>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</p>
-                  <p>PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable</p>
+                </div>
+                <li>Create a <code>vercel.json</code> file in your project root with the following settings:</li>
+                <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
+                  {`{
+  "functions": {
+    "api/*.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}`}
                 </div>
                 <li>Deploy your project</li>
               </ol>
@@ -73,8 +83,8 @@ const ScrapingServerInstructions: React.FC = () => {
               </h3>
               <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
                 <li>The server-side scraper will only work when deployed to an environment that supports Node.js and Puppeteer</li>
-                <li>Puppeteer requires specific dependencies that may need to be installed on your server</li>
                 <li>For Vercel, use Node.js runtime {'>='} 18.x</li>
+                <li>Increase memory allocation and function duration in your vercel.json file</li>
                 <li>Consider serverless function timeout limits (typical limit is 10-60 seconds)</li>
                 <li>Scraping commercial websites may violate their terms of service - use responsibly and only for educational purposes</li>
               </ul>
@@ -86,20 +96,15 @@ const ScrapingServerInstructions: React.FC = () => {
                 Troubleshooting Common Errors
               </h3>
               <ul className="list-disc list-inside text-sm text-red-700 space-y-2 mt-2">
-                <li><strong>Chrome executable not found</strong>: Make sure both environment variables are set correctly:
-                  <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-1 mb-2">
-                    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true<br/>
-                    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
-                  </div>
-                </li>
-                <li><strong>Function timeout</strong>: If scraping takes too long, increase your function timeout in Vercel settings.</li>
-                <li><strong>Memory limits</strong>: Increase memory allocation for your serverless function if needed.</li>
-                <li><strong>Puppeteer crashes</strong>: Try using the recommended Vercel Puppeteer settings shown here:
+                <li><strong>Chrome executable not found</strong>: Make sure <code>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</code> is set in your environment variables.</li>
+                <li><strong>Function timeout</strong>: If scraping takes too long, increase your function timeout in Vercel settings using vercel.json.</li>
+                <li><strong>Memory limits</strong>: Increase memory allocation for your serverless function using vercel.json.</li>
+                <li><strong>Puppeteer crashes</strong>: Try using these launch settings:
                   <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-2">
                     {`const browser = await puppeteer.launch({
-  args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'], 
+  args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
   defaultViewport: chromium.defaultViewport, 
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || await chromium.executablePath(),
+  executablePath: await chromium.executablePath(),
   headless: true,
 });`}
                   </div>
