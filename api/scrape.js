@@ -22,10 +22,14 @@ export default async function handler(req, res) {
   
   try {
     // Launch Puppeteer with appropriate options for serverless environments
+    const executablePath = await chromium.executablePath();
+    
+    console.log(`Attempting to use Chrome at path: ${executablePath}`);
+    
     const browser = await puppeteerCore.launch({
       args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars', '--disable-web-security'],
       defaultViewport: chromium.defaultViewport,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (await chromium.executablePath()),
+      executablePath,
       headless: true,
       ignoreHTTPSErrors: true,
     });

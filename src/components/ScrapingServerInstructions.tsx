@@ -11,7 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Code, Server, ExternalLink } from 'lucide-react';
+import { Code, Server, ExternalLink, AlertTriangle } from 'lucide-react';
 
 const ScrapingServerInstructions: React.FC = () => {
   return (
@@ -37,10 +37,9 @@ const ScrapingServerInstructions: React.FC = () => {
               <ol className="list-decimal list-inside text-sm space-y-2 pl-2">
                 <li>Export this project from Lovable to your GitHub</li>
                 <li>Create a new project on Vercel and connect it to your GitHub repo</li>
-                <li>Add the following to your Vercel project settings:</li>
+                <li>Add the following to your Vercel project settings under Environment Variables:</li>
                 <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
                   <p>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</p>
-                  <p>PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable</p>
                 </div>
                 <li>Deploy your project</li>
               </ol>
@@ -77,6 +76,28 @@ const ScrapingServerInstructions: React.FC = () => {
                 <li>For Vercel, use Node.js runtime {'>='} 18.x</li>
                 <li>Consider serverless function timeout limits (typical limit is 10-60 seconds)</li>
                 <li>Scraping commercial websites may violate their terms of service - use responsibly and only for educational purposes</li>
+              </ul>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded p-4 mt-4">
+              <h3 className="font-medium flex items-center gap-1 text-red-700">
+                <AlertTriangle className="h-4 w-4" />
+                Troubleshooting Common Errors
+              </h3>
+              <ul className="list-disc list-inside text-sm text-red-700 space-y-2 mt-2">
+                <li><strong>Chrome executable not found</strong>: Make sure you're using @sparticuz/chromium and not puppeteer's bundled Chrome.</li>
+                <li><strong>Function timeout</strong>: If scraping takes too long, increase your function timeout in Vercel settings.</li>
+                <li><strong>Memory limits</strong>: Increase memory allocation for your serverless function if needed.</li>
+                <li><strong>Puppeteer crashes</strong>: Try using the recommended Vercel Puppeteer settings shown here:
+                  <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-2">
+                    {`const browser = await puppeteer.launch({
+  args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'], 
+  defaultViewport: chromium.defaultViewport, 
+  executablePath: await chromium.executablePath(),
+  headless: true,
+});`}
+                  </div>
+                </li>
               </ul>
             </div>
 
