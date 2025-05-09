@@ -30,13 +30,8 @@ export default async function handler(req, res) {
         '--disable-dev-shm-usage',
         '--disable-features=IsolateOrigins',
         '--disable-site-isolation-trials',
-        '--disable-extensions',
-        '--disable-component-extensions-with-background-pages',
-        '--single-process',
-        '--no-zygote',
       ],
-      headless: true, // Explicit headless mode
-      ignoreHTTPSErrors: true,
+      headless: true,
     });
     
     console.log('Chrome launched successfully');
