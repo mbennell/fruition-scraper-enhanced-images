@@ -40,6 +40,7 @@ const ScrapingServerInstructions: React.FC = () => {
                 <li>Add the following to your Vercel project settings under Environment Variables:</li>
                 <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
                   <p>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</p>
+                  <p>PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable</p>
                 </div>
                 <li>Deploy your project</li>
               </ol>
@@ -85,7 +86,12 @@ const ScrapingServerInstructions: React.FC = () => {
                 Troubleshooting Common Errors
               </h3>
               <ul className="list-disc list-inside text-sm text-red-700 space-y-2 mt-2">
-                <li><strong>Chrome executable not found</strong>: Make sure you're using @sparticuz/chromium and not puppeteer's bundled Chrome.</li>
+                <li><strong>Chrome executable not found</strong>: Make sure both environment variables are set correctly:
+                  <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-1 mb-2">
+                    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true<br/>
+                    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+                  </div>
+                </li>
                 <li><strong>Function timeout</strong>: If scraping takes too long, increase your function timeout in Vercel settings.</li>
                 <li><strong>Memory limits</strong>: Increase memory allocation for your serverless function if needed.</li>
                 <li><strong>Puppeteer crashes</strong>: Try using the recommended Vercel Puppeteer settings shown here:
@@ -93,7 +99,7 @@ const ScrapingServerInstructions: React.FC = () => {
                     {`const browser = await puppeteer.launch({
   args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'], 
   defaultViewport: chromium.defaultViewport, 
-  executablePath: await chromium.executablePath(),
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || await chromium.executablePath(),
   headless: true,
 });`}
                   </div>

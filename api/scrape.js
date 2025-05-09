@@ -1,4 +1,3 @@
-
 // Server-side scraping endpoint using Puppeteer
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
@@ -22,7 +21,15 @@ export default async function handler(req, res) {
   
   try {
     // Launch Puppeteer with appropriate options for serverless environments
-    const executablePath = await chromium.executablePath();
+    let executablePath;
+    
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      console.log(`Using Chrome from environment variable: ${executablePath}`);
+    } else {
+      executablePath = await chromium.executablePath();
+      console.log(`Using Chrome from @sparticuz/chromium: ${executablePath}`);
+    }
     
     console.log(`Attempting to use Chrome at path: ${executablePath}`);
     
