@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   Alert,
@@ -56,6 +57,11 @@ const ScrapingServerInstructions: React.FC = () => {
   }
 }`}
                 </div>
+                <li>If you encounter library dependency errors, create a <code>.vercelignore</code> file:</li>
+                <div className="bg-gray-100 p-3 rounded font-mono text-sm mt-1">
+                  {`node_modules
+.git`}
+                </div>
                 <li>Deploy your project</li>
               </ol>
             </div>
@@ -101,27 +107,54 @@ const ScrapingServerInstructions: React.FC = () => {
               </h3>
               <ul className="list-disc list-inside text-sm text-red-700 space-y-2 mt-2">
                 <li><strong>Chrome executable not found</strong>: Make sure <code>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</code> is set in your environment variables.</li>
-                <li><strong>Missing shared libraries</strong>: If you see errors about missing libraries like <code>libnspr4.so</code>, you need to set up Vercel with additional configuration:</li>
+                <li><strong>Missing shared libraries</strong>: If you see errors about missing libraries like <code>libnspr4.so</code>, you need to solve this with one of these approaches:</li>
                 <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-2 ml-6">
-                  {`// In your vercel.json file:
+                  {`// OPTION 1: Use Chrome-AWS-Lambda compatibility layer - add to your api/scrape.js:
+import chromium from "@sparticuz/chromium";
+
+const browser = await puppeteer.launch({
+  args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+  defaultViewport: chromium.defaultViewport, 
+  executablePath: await chromium.executablePath(),
+  headless: chromium.headless,
+  ignoreHTTPSErrors: true,
+});`}
+                </div>
+                <div className="mt-2">
+                  <strong>OPTION 2:</strong> Use a custom Vercel builder that includes Chrome dependencies:
+                </div>
+                <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-2 ml-6">
+                  {`// In your vercel.json:
 {
-  // ...other settings
-  "build": {
-    "env": {
-      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["node_modules/**"]
+      }
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
     }
-  }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
 }`}
                 </div>
                 <li><strong>Function timeout</strong>: If scraping takes too long, increase your function timeout in Vercel settings using vercel.json.</li>
                 <li><strong>Memory limits</strong>: Increase memory allocation for your serverless function using vercel.json.</li>
-                <li><strong>Puppeteer crashes</strong>: Try using these launch settings:
+                <li><strong>Puppeteer crashes</strong>: Try using these optimized launch settings:
                   <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-2">
                     {`const browser = await puppeteer.launch({
-  args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+  args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-features=IsolateOrigins', '--disable-site-isolation-trials'],
   defaultViewport: chromium.defaultViewport, 
   executablePath: await chromium.executablePath(),
-  headless: true,
+  headless: chromium.headless,
   ignoreHTTPSErrors: true,
 });`}
                   </div>
@@ -140,6 +173,12 @@ const ScrapingServerInstructions: React.FC = () => {
                 <ExternalLink className="h-4 w-4" />
                 <a href="https://github.com/vercel/community/discussions/43" target="_blank" rel="noopener noreferrer">
                   Vercel Community Discussion on Puppeteer Issues
+                </a>
+              </div>
+              <div className="flex items-center gap-1 text-sm text-blue-600">
+                <ExternalLink className="h-4 w-4" />
+                <a href="https://pptr.dev/troubleshooting" target="_blank" rel="noopener noreferrer">
+                  Puppeteer Official Troubleshooting Guide
                 </a>
               </div>
             </div>
