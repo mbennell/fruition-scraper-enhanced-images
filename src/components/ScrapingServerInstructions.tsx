@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   Alert,
@@ -49,6 +48,11 @@ const ScrapingServerInstructions: React.FC = () => {
       "memory": 1024,
       "maxDuration": 60
     }
+  },
+  "build": {
+    "env": {
+      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+    }
   }
 }`}
                 </div>
@@ -97,6 +101,18 @@ const ScrapingServerInstructions: React.FC = () => {
               </h3>
               <ul className="list-disc list-inside text-sm text-red-700 space-y-2 mt-2">
                 <li><strong>Chrome executable not found</strong>: Make sure <code>PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true</code> is set in your environment variables.</li>
+                <li><strong>Missing shared libraries</strong>: If you see errors about missing libraries like <code>libnspr4.so</code>, you need to set up Vercel with additional configuration:</li>
+                <div className="bg-gray-100 p-3 rounded font-mono text-xs mt-2 ml-6">
+                  {`// In your vercel.json file:
+{
+  // ...other settings
+  "build": {
+    "env": {
+      "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+    }
+  }
+}`}
+                </div>
                 <li><strong>Function timeout</strong>: If scraping takes too long, increase your function timeout in Vercel settings using vercel.json.</li>
                 <li><strong>Memory limits</strong>: Increase memory allocation for your serverless function using vercel.json.</li>
                 <li><strong>Puppeteer crashes</strong>: Try using these launch settings:
@@ -106,17 +122,26 @@ const ScrapingServerInstructions: React.FC = () => {
   defaultViewport: chromium.defaultViewport, 
   executablePath: await chromium.executablePath(),
   headless: true,
+  ignoreHTTPSErrors: true,
 });`}
                   </div>
                 </li>
               </ul>
             </div>
 
-            <div className="flex items-center gap-1 text-sm text-blue-600 mt-2">
-              <ExternalLink className="h-4 w-4" />
-              <a href="https://vercel.com/guides/deploying-puppeteer-with-vercel" target="_blank" rel="noopener noreferrer">
-                Read more about deploying Puppeteer on Vercel
-              </a>
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center gap-1 text-sm text-blue-600">
+                <ExternalLink className="h-4 w-4" />
+                <a href="https://vercel.com/guides/deploying-puppeteer-with-vercel" target="_blank" rel="noopener noreferrer">
+                  Read more about deploying Puppeteer on Vercel
+                </a>
+              </div>
+              <div className="flex items-center gap-1 text-sm text-blue-600">
+                <ExternalLink className="h-4 w-4" />
+                <a href="https://github.com/vercel/community/discussions/43" target="_blank" rel="noopener noreferrer">
+                  Vercel Community Discussion on Puppeteer Issues
+                </a>
+              </div>
             </div>
           </AccordionContent>
         </AccordionItem>
