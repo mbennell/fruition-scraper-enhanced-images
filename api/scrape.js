@@ -204,7 +204,7 @@ export default async function handler(req, res) {
     await csvWriter.writeRecords(records);
     console.log(`CSV written to ${csvPath}`);
 
-    // 6. Return CSV data directly instead of relying on fallback
+    // 6. Return CSV data directly
     res.status(200).json({
       success: true,
       products: products,
@@ -224,7 +224,7 @@ export default async function handler(req, res) {
     
     res.status(500).json({ 
       success: false, 
-      message: 'Server-side scraping failed. This is likely due to Vercel serverless function limitations. Please see the detailed error message below.',
+      message: 'Server-side scraping failed. Please check if you entered a valid URL and try again.',
       error: errorDetails
     });
   }
