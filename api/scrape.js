@@ -1,6 +1,7 @@
 
 // Server-side scraping endpoint using Puppeteer
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 export default async function handler(req, res) {
   // Only allow POST requests
@@ -17,10 +18,12 @@ export default async function handler(req, res) {
   console.log(`Server-side scraping started for: ${url}`);
   
   try {
-    // Launch Puppeteer with appropriate options
+    // Launch Puppeteer with appropriate options for serverless environments
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     });
     
     const page = await browser.newPage();
