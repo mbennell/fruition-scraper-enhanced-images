@@ -3,6 +3,9 @@
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 
+// Configure Chrome for serverless environment
+chromium.setGraphicsMode = false;
+
 export default async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -20,10 +23,11 @@ export default async function handler(req, res) {
   try {
     // Launch Puppeteer with appropriate options for serverless environments
     const browser = await puppeteer.launch({
-      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--hide-scrollbars', '--disable-web-security'],
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (await chromium.executablePath()),
+      headless: true,
+      ignoreHTTPSErrors: true,
     });
     
     const page = await browser.newPage();
@@ -31,8 +35,10 @@ export default async function handler(req, res) {
     // Set a reasonable viewport
     await page.setViewport({ width: 1280, height: 800 });
     
-    // Set user agent to appear as a regular browser
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    // Set user agent to avoid detection
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    );
     
     // Navigate to the URL with a timeout
     await page.goto(url, { 
@@ -54,7 +60,8 @@ export default async function handler(req, res) {
       const productSelectors = [
         '.product-item, .ProductItem', // Shopify & SquareSpace
         '.product-card, .product', // WooCommerce & Other
-        'article[data-product-id], div[data-product-id]' // Generic product IDs
+        'article[data-product-id], div[data-product-id]', // Generic product IDs
+        '.product-grid__item' // Additional R+Co specific selector
       ];
       
       let productElements = [];
@@ -84,13 +91,17 @@ export default async function handler(req, res) {
       
       return productElements.map((element, index) => {
         // Find product name
-        const nameElement = element.querySelector('h2, h3, h4, .product-name, .product-title, .title, [class*="title"], [class*="name"]');
+        const nameElement = element.querySelector('h2, h3, h4, .product-name, .product-title, .title, [class*="title"], [class*="name"], .product-item__title, .card-title');
         
         // Find price
-        const priceElement = element.querySelector('.price, .product-price, [class*="price"], [data-price]');
+        const priceElement = element.querySelector('.price, .product-price, [class*="price"], [data-price], .product-item__price');
         
         // Find description
         const descElement = element.querySelector('.description, [class*="description"], p:not(.price):not([class*="price"]):not([class*="title"]):not([class*="name"])');
+        
+        // Find link to product page
+        const linkElement = element.querySelector('a');
+        const productUrl = linkElement ? linkElement.href : null;
         
         // Find image
         const imgElement = element.querySelector('img');
@@ -110,6 +121,11 @@ export default async function handler(req, res) {
           }
         }
         
+        // Attempt to use higher resolution versions if available
+        if ((imageUrl && imageUrl.includes("_small.")) || (imageUrl && imageUrl.includes("_medium."))) {
+          highResImageUrl = imageUrl.replace("_small.", "_large.").replace("_medium.", "_large.");
+        }
+        
         const name = extractText(nameElement) || `Product ${index + 1}`;
         const price = extractText(priceElement) || 'Price not available';
         const description = extractText(descElement) || 'No description available';
@@ -120,20 +136,38 @@ export default async function handler(req, res) {
           price,
           description,
           imageUrl,
-          highResImageUrl,
-          sourceUrl: window.location.href
+          highResImageUrl: highResImageUrl || imageUrl,
+          sourceUrl: productUrl || window.location.href
         };
       });
+    });
+    
+    // Take a screenshot for debugging purposes
+    const screenshot = await page.screenshot({
+      type: "jpeg",
+      quality: 80,
+      fullPage: false,
     });
     
     await browser.close();
     
     console.log(`Server-side scraping completed. Found ${products.length} products.`);
     
+    // Check if we found any products
+    if (products.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No products found on the page",
+        screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
+        fallback: true
+      });
+    }
+    
     // Return the scraped products
     return res.status(200).json({ 
       success: true, 
-      products: products.filter(p => p.name && p.name !== 'undefined')
+      products: products.filter(p => p.name && p.name !== 'undefined'),
+      screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`
     });
     
   } catch (error) {
