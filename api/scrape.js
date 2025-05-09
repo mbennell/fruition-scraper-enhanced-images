@@ -1,10 +1,7 @@
 
-// Server-side scraping endpoint using Puppeteer
-import puppeteerCore from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
-
-// Configure Chrome for serverless environment
-chromium.setGraphicsMode = false;
+// Server-side scraping endpoint using Playwright
+import { chromium } from 'playwright-core';
+import chromiumBinary from '@sparticuz/chromium';
 
 export default async function handler(req, res) {
   // Only allow POST requests
@@ -22,11 +19,12 @@ export default async function handler(req, res) {
   
   try {
     // Launch browser with optimized serverless settings
-    console.log('Attempting to launch Chrome using @sparticuz/chromium');
+    console.log('Attempting to launch Chrome using Playwright with @sparticuz/chromium');
     
-    const browser = await puppeteerCore.launch({
+    const browser = await chromium.launch({
+      executablePath: await chromiumBinary.executablePath(),
       args: [
-        ...chromium.args,
+        ...chromiumBinary.args,
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
@@ -34,84 +32,32 @@ export default async function handler(req, res) {
         '--disable-site-isolation-trials',
         '--disable-extensions',
         '--disable-component-extensions-with-background-pages',
-        '--disable-default-apps',
-        '--mute-audio',
-        // Additional optimization flags
         '--single-process',
         '--no-zygote',
-        '--disable-background-networking',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-sync',
-        '--metrics-recording-only',
       ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
     });
     
     console.log('Chrome launched successfully');
     
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    });
     
-    // Set a reasonable viewport
-    await page.setViewport({ width: 1280, height: 800 });
+    const page = await context.newPage();
     
-    // Set user agent to avoid detection
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    );
-    
-    // Enable detailed console logging for debugging
+    // Enable console logging for debugging
     page.on('console', msg => console.log('PAGE CONSOLE:', msg.text()));
-    page.on('error', err => console.error('PAGE ERROR:', err));
-    page.on('pageerror', err => console.error('PAGE ERROR:', err));
     
     console.log(`Navigating to: ${url}`);
+    
     // Navigate to the URL with a timeout
     await page.goto(url, { 
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: 30000 
     });
     
     console.log('Page loaded, waiting for product elements');
-    
-    // Instead of immediately waiting for selectors, check if they exist first
-    const hasProducts = await page.evaluate(() => {
-      const selectors = [
-        '.product-item, .ProductItem', 
-        '.product-card, .product', 
-        'article[data-product-id], div[data-product-id]',
-        '.product-grid__item',
-        // Check for common grid containers
-        '.grid--view-items',
-        '.collection-grid'
-      ];
-      
-      for (const selector of selectors) {
-        if (document.querySelector(selector)) {
-          console.log(`Found products with selector: ${selector}`);
-          return true;
-        }
-      }
-      return false;
-    });
-    
-    console.log(`Product detection result: ${hasProducts ? 'Products found' : 'No products detected'}`);
-    
-    // Only try to wait for selector if we detected products
-    if (hasProducts) {
-      try {
-        await page.waitForSelector('.product-item, .ProductItem, [class*="product-card"], .product-grid', { 
-          timeout: 5000 
-        });
-        console.log('Product selectors loaded successfully');
-      } catch (e) {
-        console.log('Timed out waiting for specific product selectors, will try to scrape anyway');
-      }
-    }
     
     // Take an initial screenshot
     const initialScreenshot = await page.screenshot({
@@ -120,7 +66,7 @@ export default async function handler(req, res) {
       fullPage: false,
     });
     
-    // Extract products using Puppeteer's evaluate
+    // Extract products using Playwright's evaluate
     console.log('Attempting to extract products');
     const products = await page.evaluate(() => {
       // Helper function to extract text safely
@@ -251,7 +197,7 @@ export default async function handler(req, res) {
       return res.status(404).json({
         success: false,
         message: "No products found on the page",
-        screenshot: `data:image/jpeg;base64,${initialScreenshot.toString("base64")}`,
+        screenshot: `data:image/jpeg;base64,${Buffer.from(initialScreenshot).toString("base64")}`,
         htmlPreview,
         fallback: true
       });
@@ -261,7 +207,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ 
       success: true, 
       products: products.filter(p => p.name && p.name !== 'undefined'),
-      screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`
+      screenshot: `data:image/jpeg;base64,${Buffer.from(screenshot).toString("base64")}`
     });
     
   } catch (error) {
