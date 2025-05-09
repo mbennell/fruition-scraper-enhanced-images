@@ -1,5 +1,5 @@
 
-// Server-side scraping endpoint using Playwright
+// Server-side scraping endpoint using Playwright with optimized serverless configuration
 import { chromium } from 'playwright-core';
 import chromiumBinary from '@sparticuz/chromium';
 
@@ -18,9 +18,12 @@ export default async function handler(req, res) {
   console.log(`Server-side scraping started for: ${url}`);
   
   try {
-    // Launch browser with optimized serverless settings
+    // Set Chromium executable path for serverless environment
+    chromiumBinary.setGraphicsMode('swiftshader');
+    
     console.log('Attempting to launch Chrome using Playwright with @sparticuz/chromium');
     
+    // Launch browser with serverless-optimized settings
     const browser = await chromium.launch({
       executablePath: await chromiumBinary.executablePath(),
       args: [
@@ -179,11 +182,7 @@ export default async function handler(req, res) {
       fullPage: false,
     });
     
-    // Get page HTML for debugging
-    const pageHtml = await page.content();
-    const htmlPreview = pageHtml.slice(0, 1000) + '... [truncated]';
-    console.log('Page HTML preview:', htmlPreview);
-    
+    // Close browser correctly to release resources
     await browser.close();
     
     console.log(`Server-side scraping completed. Found ${products.length} products.`);
@@ -195,7 +194,6 @@ export default async function handler(req, res) {
         success: false,
         message: "No products found on the page",
         screenshot: `data:image/jpeg;base64,${Buffer.from(initialScreenshot).toString("base64")}`,
-        htmlPreview,
         fallback: true
       });
     }
@@ -209,14 +207,31 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('Error during server-side scraping:', error);
+    
+    // Get detailed error information for debugging
+    let errorDetails = {
+      name: error.name,
+      stack: error.stack,
+      isVercel: !!process.env.VERCEL
+    };
+    
+    // Add environment information for debugging
+    if (process.env.VERCEL) {
+      try {
+        const { execSync } = require('child_process');
+        const lsOutput = execSync('ls -la /tmp').toString();
+        const depsOutput = execSync('ldd $(which node) | grep -i "not found"').toString();
+        errorDetails.lsOutput = lsOutput;
+        errorDetails.missingDeps = depsOutput;
+      } catch (e) {
+        errorDetails.debugError = e.message;
+      }
+    }
+    
     return res.status(500).json({ 
       success: false, 
       message: `Failed to scrape products: ${error.message}`,
-      errorDetails: {
-        name: error.name,
-        stack: error.stack,
-        isVercel: !!process.env.VERCEL
-      },
+      errorDetails,
       fallback: true
     });
   }
