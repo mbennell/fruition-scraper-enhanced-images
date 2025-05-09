@@ -40,18 +40,64 @@ export default async function handler(req, res) {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     );
     
+    // Enable detailed console logging for debugging
+    page.on('console', msg => console.log('PAGE CONSOLE:', msg.text()));
+    page.on('error', err => console.error('PAGE ERROR:', err));
+    page.on('pageerror', err => console.error('PAGE ERROR:', err));
+    
+    console.log(`Navigating to: ${url}`);
     // Navigate to the URL with a timeout
     await page.goto(url, { 
       waitUntil: 'networkidle2',
       timeout: 30000 
     });
     
-    // Wait for product elements to be visible
-    await page.waitForSelector('.product-item, .ProductItem, [class*="product-card"], .product-grid', { 
-      timeout: 10000 
-    }).catch(() => console.log('Could not find product elements, will try to scrape anyway'));
+    console.log('Page loaded, waiting for product elements');
+    
+    // Instead of immediately waiting for selectors, check if they exist first
+    const hasProducts = await page.evaluate(() => {
+      const selectors = [
+        '.product-item, .ProductItem', 
+        '.product-card, .product', 
+        'article[data-product-id], div[data-product-id]',
+        '.product-grid__item',
+        // Check for common grid containers
+        '.grid--view-items',
+        '.collection-grid'
+      ];
+      
+      for (const selector of selectors) {
+        if (document.querySelector(selector)) {
+          console.log(`Found products with selector: ${selector}`);
+          return true;
+        }
+      }
+      return false;
+    });
+    
+    console.log(`Product detection result: ${hasProducts ? 'Products found' : 'No products detected'}`);
+    
+    // Only try to wait for selector if we detected products
+    if (hasProducts) {
+      try {
+        await page.waitForSelector('.product-item, .ProductItem, [class*="product-card"], .product-grid', { 
+          timeout: 5000 
+        });
+        console.log('Product selectors loaded successfully');
+      } catch (e) {
+        console.log('Timed out waiting for specific product selectors, will try to scrape anyway');
+      }
+    }
+    
+    // Take an initial screenshot
+    const initialScreenshot = await page.screenshot({
+      type: "jpeg",
+      quality: 80,
+      fullPage: false,
+    });
     
     // Extract products using Puppeteer's evaluate
+    console.log('Attempting to extract products');
     const products = await page.evaluate(() => {
       // Helper function to extract text safely
       const extractText = (element) => element ? element.textContent.trim() : '';
@@ -61,7 +107,9 @@ export default async function handler(req, res) {
         '.product-item, .ProductItem', // Shopify & SquareSpace
         '.product-card, .product', // WooCommerce & Other
         'article[data-product-id], div[data-product-id]', // Generic product IDs
-        '.product-grid__item' // Additional R+Co specific selector
+        '.product-grid__item', // Additional R+Co specific selector
+        '.grid__item', // Common Shopify selector
+        '.collection-product'
       ];
       
       let productElements = [];
@@ -70,6 +118,7 @@ export default async function handler(req, res) {
       for (const selector of productSelectors) {
         const elements = document.querySelectorAll(selector);
         if (elements.length > 0) {
+          console.log(`Found ${elements.length} products with selector: ${selector}`);
           productElements = Array.from(elements);
           break;
         }
@@ -77,17 +126,31 @@ export default async function handler(req, res) {
       
       // If we still don't have products, try looking in product grids
       if (productElements.length === 0) {
-        const grids = document.querySelectorAll('.product-grid, .products, .collection-products, .collection__products');
+        console.log('No products found with standard selectors, trying grid containers');
+        const grids = document.querySelectorAll('.product-grid, .products, .collection-products, .collection__products, .grid--view-items');
         if (grids.length > 0) {
           for (const grid of grids) {
             const items = grid.querySelectorAll('li, .grid__item, .grid-item, > div');
             if (items.length > 0) {
+              console.log(`Found ${items.length} products in grid container`);
               productElements = Array.from(items);
               break;
             }
           }
         }
       }
+      
+      // If we still don't have products, try a more aggressive approach
+      if (productElements.length === 0) {
+        console.log('No products found in grids, trying generic product detection');
+        // Look for elements with product-like attributes
+        const possibleProducts = document.querySelectorAll('a[href*="product"], div:has(img):has(.price)');
+        if (possibleProducts.length > 0) {
+          productElements = Array.from(possibleProducts);
+        }
+      }
+      
+      console.log(`Total products found: ${productElements.length}`);
       
       return productElements.map((element, index) => {
         // Find product name
@@ -142,12 +205,17 @@ export default async function handler(req, res) {
       });
     });
     
-    // Take a screenshot for debugging purposes
+    // Take a final screenshot for debugging purposes
     const screenshot = await page.screenshot({
       type: "jpeg",
       quality: 80,
       fullPage: false,
     });
+    
+    // Get page HTML for debugging
+    const pageHtml = await page.content();
+    const htmlPreview = pageHtml.slice(0, 1000) + '... [truncated]';
+    console.log('Page HTML preview:', htmlPreview);
     
     await browser.close();
     
@@ -155,10 +223,12 @@ export default async function handler(req, res) {
     
     // Check if we found any products
     if (products.length === 0) {
+      console.log('No products found, returning initial screenshot for debugging');
       return res.status(404).json({
         success: false,
         message: "No products found on the page",
-        screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
+        screenshot: `data:image/jpeg;base64,${initialScreenshot.toString("base64")}`,
+        htmlPreview,
         fallback: true
       });
     }
