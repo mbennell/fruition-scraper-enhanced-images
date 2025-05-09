@@ -1,7 +1,6 @@
 
 // api/scrape.js
 import { chromium } from 'playwright';
-import chromiumExtra from '@sparticuz/chromium';
 import { createObjectCsvWriter } from 'csv-writer';
 import fs from 'fs';
 import path from 'path';
@@ -17,11 +16,32 @@ export default async function handler(req, res) {
   console.log(`Scraping started for: ${url}`);
   
   try {
-    // 1. Launch headless Chromium with special Vercel serverless configuration using @sparticuz/chromium
-    const browser = await chromium.launch({ 
+    // Launch Chromium with reduced memory usage
+    const browser = await chromium.launch({
       headless: true,
-      executablePath: await chromiumExtra.executablePath(),
-      args: chromiumExtra.args,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-update',
+        '--disable-sync',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--no-default-browser-check',
+        '--no-first-run',
+        '--disable-default-apps',
+        '--disable-popup-blocking',
+        '--disable-extensions'
+      ]
     });
     
     console.log('Browser launched successfully');
@@ -31,14 +51,15 @@ export default async function handler(req, res) {
     page.on('console', msg => console.log('PAGE CONSOLE:', msg.text()));
     
     console.log(`Navigating to: ${url}`);
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    // Use domcontentloaded instead of networkidle to save resources
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     console.log('Page loaded, waiting for product elements');
     
     // Take an initial screenshot for debugging
-    const screenshot = await page.screenshot({ type: 'jpeg', quality: 80 });
+    const screenshot = await page.screenshot({ type: 'jpeg', quality: 50 }); // Reduced quality
     console.log('Screenshot taken');
 
-    // 2. More flexible product selector for different Shopify themes
+    // 2. More efficient product selector for different Shopify themes
     const productSelectors = [
       '.product-card',
       '.grid__item',
@@ -60,8 +81,9 @@ export default async function handler(req, res) {
       const hasSelector = await page.$(selector);
       if (!hasSelector) continue;
       
+      // Use evaluateHandle for more memory efficiency
       products = await page.$$eval(selector, items => {
-        return items.map(item => {
+        return items.slice(0, 50).map(item => { // Limit to 50 products max to save memory
           // Try different possible selectors for product elements
           const title = item.querySelector('.product-card__title, .product-item__title, .product-title, .title, h2, h3')?.textContent.trim() || 'Unknown Product';
           const description = item.querySelector('.product-card__description, .product-item__description, .description, p:not(.product-card__price)')?.textContent.trim() || '';
@@ -70,17 +92,7 @@ export default async function handler(req, res) {
           let imageUrl = '';
           const img = item.querySelector('img');
           if (img) {
-            // Try to get high-res version first
             imageUrl = img.dataset.src || img.getAttribute('data-srcset') || img.srcset || img.src || '';
-            
-            // If we have srcset, get the largest image
-            if (img.srcset) {
-              const srcsetItems = img.srcset.split(',');
-              if (srcsetItems.length > 0) {
-                const lastItem = srcsetItems[srcsetItems.length - 1].trim().split(' ')[0];
-                if (lastItem) imageUrl = lastItem;
-              }
-            }
           }
           
           // Get product URL
@@ -94,7 +106,7 @@ export default async function handler(req, res) {
           
           return {
             Title: title,
-            Description: description,
+            Description: description && description.length > 300 ? description.substring(0, 300) + '...' : description, // Truncate long descriptions
             'Hosted Image URLs': imageUrl,
             'Product URL': productUrl,
             Price: price
@@ -119,91 +131,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. Prepare CSV writer (matching Squarespace template)
-    const csvPath = path.join('/tmp', 'shopify_to_squarespace.csv');
-    const csvWriter = createObjectCsvWriter({
-      path: csvPath,
-      header: [
-        { id: 'Product ID [Non Editable]', title: 'Product ID [Non Editable]' },
-        { id: 'Variant ID [Non Editable]', title: 'Variant ID [Non Editable]' },
-        { id: 'Product Type [Non Editable]', title: 'Product Type [Non Editable]' },
-        { id: 'Product Page', title: 'Product Page' },
-        { id: 'Product URL', title: 'Product URL' },
-        { id: 'Title', title: 'Title' },
-        { id: 'Description', title: 'Description' },
-        { id: 'SKU', title: 'SKU' },
-        { id: 'Option Name 1', title: 'Option Name 1' },
-        { id: 'Option Value 1', title: 'Option Value 1' },
-        { id: 'Option Name 2', title: 'Option Name 2' },
-        { id: 'Option Value 2', title: 'Option Value 2' },
-        { id: 'Option Name 3', title: 'Option Name 3' },
-        { id: 'Option Value 3', title: 'Option Value 3' },
-        { id: 'Option Name 4', title: 'Option Name 4' },
-        { id: 'Option Value 4', title: 'Option Value 4' },
-        { id: 'Option Name 5', title: 'Option Name 5' },
-        { id: 'Option Value 5', title: 'Option Value 5' },
-        { id: 'Option Name 6', title: 'Option Name 6' },
-        { id: 'Option Value 6', title: 'Option Value 6' },
-        { id: 'Price', title: 'Price' },
-        { id: 'Sale Price', title: 'Sale Price' },
-        { id: 'On Sale', title: 'On Sale' },
-        { id: 'Stock', title: 'Stock' },
-        { id: 'Categories', title: 'Categories' },
-        { id: 'Tags', title: 'Tags' },
-        { id: 'Weight', title: 'Weight' },
-        { id: 'Length', title: 'Length' },
-        { id: 'Width', title: 'Width' },
-        { id: 'Height', title: 'Height' },
-        { id: 'Visible', title: 'Visible' },
-        { id: 'Hosted Image URLs', title: 'Hosted Image URLs' }
-      ]
-    });
-
-    // 4. Map scraped data into template rows
-    const records = products.map(p => ({
-      'Product ID [Non Editable]': '',
-      'Variant ID [Non Editable]': '',
-      'Product Type [Non Editable]': 'PHYSICAL',
-      'Product Page': 'shop',
-      'Product URL': p['Product URL'],
-      'Title': p.Title,
-      'Description': p.Description,
-      'SKU': '',
-      'Option Name 1': '',
-      'Option Value 1': '',
-      'Option Name 2': '',
-      'Option Value 2': '',
-      'Option Name 3': '',
-      'Option Value 3': '',
-      'Option Name 4': '',
-      'Option Value 4': '',
-      'Option Name 5': '',
-      'Option Value 5': '',
-      'Option Name 6': '',
-      'Option Value 6': '',
-      'Price': p.Price,
-      'Sale Price': '',
-      'On Sale': 'No',
-      'Stock': 'Unlimited',
-      'Categories': category,
-      'Tags': tags,
-      'Weight': '0',
-      'Length': '0',
-      'Width': '0',
-      'Height': '0',
-      'Visible': 'Yes',
-      'Hosted Image URLs': p['Hosted Image URLs']
-    }));
-
-    // 5. Write CSV
-    await csvWriter.writeRecords(records);
-    console.log(`CSV written to ${csvPath}`);
-
-    // 6. Return CSV data directly
+    // Skip CSV writer creation to save memory, just return the products
     res.status(200).json({
       success: true,
-      products: products,
-      csvData: fs.readFileSync(csvPath, 'utf8')
+      products: products
     });
 
   } catch (error) {
@@ -213,7 +144,7 @@ export default async function handler(req, res) {
     const errorDetails = {
       message: error.message,
       name: error.name,
-      stack: error.stack,
+      stack: error.stack ? error.stack.split('\n').slice(0, 3).join('\n') : '', // Limit stack trace size
       type: 'Playwright error'
     };
     
